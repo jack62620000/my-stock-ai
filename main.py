@@ -33,11 +33,14 @@ def load_data_from_sheets():
         return pd.DataFrame(columns=["Ticker", "Cost", "Note"])
 
 # --- 3. 核心運算函數 ---
+# 修改 main.py 中的 get_stock_analysis 函數
 def get_stock_analysis(symbol, cost_price=None):
     try:
-        # 下載數據
-        df = yf.download(symbol, period="1y", interval="1d")
-        if df.empty: return None
+        # 下載數據，加入 auto_adjust 確保資料格式統一
+        df = yf.download(symbol, period="1y", interval="1d", auto_adjust=True)
+        
+        if df.empty or len(df) < 20: 
+            return None
         
         # 技術指標計算 (使用 pandas_ta)
         df.ta.stoch(high='High', low='Low', close='Close', k=9, d=3, append=True)
@@ -153,5 +156,6 @@ else:
                     buy_signal = "具備安全邊際" if res['price'] < res['intrinsic'] else "股價偏高"
                     tech_signal = "動能轉強" if res['macd_h'] > 0 else "動能疲弱"
                     st.info(f"🤖 **AI 診斷報告**：目前價值面 **{buy_signal}**，技術面指標顯示 **{tech_signal}**。建議：{'偏多操作' if res['macd_h'] > 0 and res['price'] < res['intrinsic'] else '暫時觀望'}。")
+
 
                 st.markdown("---")
