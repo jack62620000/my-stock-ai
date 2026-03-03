@@ -2,15 +2,16 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import pandas_ta as ta
+import numpy as np
 
-st.set_page_config(page_title="巴菲特台股全自動戰情室", layout="wide")
+# 頁面基本設定
+st.set_page_config(page_title="台股五星級 AI 戰情室", layout="wide")
 
-# --- 1. 自動名稱對照 (證交所備援機制) ---
+# --- 1. 自動名稱抓取 (證交所官網) ---
 @st.cache_data(ttl=86400)
-def get_all_stock_names():
+def get_stock_names_map():
     names = {}
     try:
-        # 上市與上櫃清單同步抓取
         for url in ["https://isin.twse.com.tw/isin/C_public.jsp?strMode=2", 
                     "https://isin.twse.com.tw/isin/C_public.jsp?strMode=4"]:
             df = pd.read_html(url)[0]
@@ -20,109 +21,172 @@ def get_all_stock_names():
                     if len(parts) >= 2: names[parts[0].strip()] = parts[1].strip()
         return names
     except:
-        return {"2330": "台積電", "2317": "鴻海", "3131": "弘塑"}
+        return {"2330": "台積電", "2317": "鴻海"}
 
-name_map = get_all_stock_names()
+name_map = get_stock_names_map()
 
-# --- 2. 核心數據運算 (對齊試算表 A-T 欄) ---
-def get_full_metrics(code):
+# --- 2. 核心數據抓取與計算 (對齊試算表所有公式) ---
+def fetch_full_analysis(code):
     for suffix in [".TW", ".TWO"]:
         try:
             ticker = yf.Ticker(f"{code}{suffix}")
-            hist = ticker.history(period="1y")
+            hist = ticker.history(period="250d") # 抓一年的數據計算 52 週與均線
             if hist.empty: continue
             
             info = ticker.info
+            # 基本資訊
             price = hist['Close'].iloc[-1]
-            
-            # 【台股分析工作表】關鍵指標擷取
             eps = info.get('trailingEps', 0) or 0
-            roe = info.get('returnOnEquity', 0) or 0
-            gp_margin = info.get('grossMargins', 0) or 0
-            op_margin = info.get('operatingMargins', 0) or 0
-            current_ratio = info.get('currentRatio', 0) or 0
-            debt_ratio = info.get('debtToEquity', 0) / 100
-            div_yield = info.get('dividendYield', 0) or 0
-            rev_growth = info.get('revenueGrowth', 0) or 0
-            fcf = info.get('freeCashflow', 0) / 100000000 # 億元
             
-            # 【估值邏輯】
-            pe_bench = 25 if any(k in str(info.get('industry','')) for k in ["Semiconductors", "Computer"]) else 15
-            intrinsic = eps * pe_bench
-            safety = (intrinsic / price) - 1 if price > 0 else 0
-            pos_52 = (price - hist['Low'].min()) / (hist['High'].max() - hist['Low'].min())
+            # 獲利品質邏輯 (B-F 欄)
+            roe = info.get('returnOnEquity', 0)
+            gp_m = info.get('grossMargins', 0)
+            op_m = info.get('operatingMargins', 0)
+            debt_e = info.get('debtToEquity', 0) / 100 # 轉換為 %
             
-            # 【股價走勢分析】技術指標
+            # 估值邏輯 (G-L 欄)
+            m_pe = info.get('trailingPE', 0)
+            ind = str(info.get('industry', ''))
+            # 基準 PE 邏輯
+            if any(k in ind for k in ["Semiconductor", "Computer"]): b_pe = 22.5 
+            elif "Financial" in ind: b_pe = 14
+            else: b_pe = 12
+            
+            intrinsic = eps * b_pe
+            low_52, high_52 = hist['Low'].min(), hist['High'].max()
+            pos_52 = (price - low_52) / (high_52 - low_52) if high_52 > low_52 else 0
+            
+            # 進階風險 (M-Q 欄)
+            fcf = (info.get('freeCashflow', 0) or 0) / 100000000
+            quick_r = info.get('quickRatio', 0)
+            curr_r = info.get('currentRatio', 0)
+            div_y = info.get('dividendYield', 0)
+            rev_g = info.get('revenueGrowth', 0)
+            
+            # 技術指標 (走勢分析表)
             df = hist.copy()
+            df['MA5'] = ta.sma(df['Close'], length=5)
+            df['MA20'] = ta.sma(df['Close'], length=20)
+            df['MA60'] = ta.sma(df['Close'], length=60)
             df['RSI'] = ta.rsi(df['Close'], length=14)
-            df['MA20'] = df['Close'].rolling(20).mean()
-            df['MA60'] = df['Close'].rolling(60).mean()
+            kd = ta.stoch(df['High'], df['Low'], df['Close'])
             macd = ta.macd(df['Close'])
             
+            # 布林通道
+            bol = ta.bbands(df['Close'], length=20, std=2)
+            
             return {
-                "price": price, "name": name_map.get(code, info.get('shortName', code)),
-                "intrinsic": intrinsic, "safety": safety, "pos_52": pos_52,
-                "roe": roe, "eps": eps, "gp": gp_margin, "op": op_margin,
-                "current": current_ratio, "debt": debt_ratio, "div": div_yield, 
-                "rev": rev_growth, "fcf": fcf, "df": df, "macd": macd, "pe_bench": pe_bench
+                "price": price, "roe": roe, "gp": gp_m, "op": op_m, "debt": debt_e,
+                "m_pe": m_pe, "b_pe": b_pe, "eps": eps, "intrinsic": intrinsic, "pos_52": pos_52,
+                "fcf": fcf, "quick": quick_r, "curr": curr_r, "div": div_y, "rev": rev_g,
+                "df": df, "kd": kd, "macd": macd, "bol": bol, "industry": ind
             }
         except: continue
     return None
 
-# --- 3. UI 介面展示 ---
-code_input = st.sidebar.text_input("🔍 輸入台股代碼", placeholder="例如: 3131").strip()
+# --- 3. UI 渲染 ---
+code_input = st.sidebar.text_input("🔍 輸入台股代碼 (例: 3131, 2330)", "").strip()
 
 if code_input:
-    d = get_full_metrics(code_input)
+    d = fetch_full_analysis(code_input)
     if d:
-        st.title(f"📊 {d['name']} ({code_input}) 戰情報告")
+        name = name_map.get(code_input, "未知個股")
+        st.title(f"📊 {name} ({code_input}) 投資與走勢全診斷")
         
-        # 區塊一：核心估值與位階 (A-L 欄)
-        st.subheader("💎 獲利品質與核心估值")
-        m1, m2, m3, m4 = st.columns(4)
-        m1.metric("目前股價", f"{round(d['price'], 1)} 元")
-        m2.metric("實證合理價", f"{round(d['intrinsic'], 1)} 元", help=f"EPS({d['eps']}) x 基準PE({d['pe_bench']})")
-        m3.metric("安全邊際", f"{round(d['safety']*100, 1)}%")
-        m4.metric("52週位階", f"{round(d['pos_52']*100, 1)}%")
+        # --- 第一部分：台股分析 (B-T 欄) ---
+        st.header("📌 台股基本面分析 (第 1-4 列指標)")
+        
+        with st.container(border=True):
+            # 第一排：獲利品質
+            t1, t2, t3, t4, t5 = st.columns(5)
+            t1.metric("ROE (賺錢效率)", f"{round(d['roe']*100, 2)}%", "卓越" if d['roe']>0.15 else "警戒")
+            t2.metric("毛利率 (競爭力)", f"{round(d['gp']*100, 1)}%")
+            t3.metric("營業利益率", f"{round(d['op']*100, 1)}%")
+            t4.metric("負債比 (財務壓力)", f"{round(d['debt']*100, 1)}%", delta_color="inverse")
+            t5.metric("自由現金流", f"{round(d['fcf'],1)} 億")
 
-        # 區塊二：財務健康過濾 (M-Q 欄)
-        st.markdown("---")
-        st.subheader("🔍 進階財務風險過濾")
-        f1, f2, f3, f4 = st.columns(4)
-        with f1:
-            st.write(f"**ROE:** {round(d['roe']*100, 2)}% {'✅' if d['roe']>0.15 else '⚠️'}")
-            st.write(f"**毛利率:** {round(d['gp']*100, 2)}%")
-        with f2:
-            st.write(f"**自由現金流:** {round(d['fcf'], 1)} 億")
-            st.write(f"**營收年增率:** {round(d['rev']*100, 1)}%")
-        with f3:
-            st.write(f"**流動比率:** {round(d['current']*100, 1)}%")
-            st.write(f"**負債比率:** {round(d['debt']*100, 1)}%")
-        with f4:
-            st.write(f"**現金殖利率:** {round(d['div']*100, 2)}%")
-            st.write(f"**實證 PE:** {d['pe_bench']} 倍")
+            # 第二排：估值與位階
+            t6, t7, t8, t9, t10 = st.columns(5)
+            t6.metric("市場 P/E", f"{round(d['m_pe'],1)} 倍")
+            t7.metric("基準 P/E", f"{d['b_pe']} 倍")
+            t8.metric("實證合理價", f"{round(d['intrinsic'],1)} 元")
+            safety = (d['intrinsic']/d['price'])-1
+            t9.metric("安全邊際", f"{round(safety*100, 1)}%", f"{'具補漲空間' if safety > 0.1 else '溢價'}")
+            t10.metric("52週位階", f"{round(d['pos_52']*100, 1)}%", "過熱" if d['pos_52']>0.75 else "低位階")
 
-        # 區塊三：AI 全方位決策 (T 欄)
-        st.markdown("---")
-        if d['roe'] > 0.18 and d['safety'] > 0.1: 
-            res = "🌟【卓越成長】高獲利且低估值，適合長線佈局。"
-        elif d['pos_52'] > 0.85: 
-            res = "🟠【過熱警戒】位階過高，建議等待回檔不追高。"
-        elif d['fcf'] < 0: 
-            res = "🚨【現金流警訊】盈餘品質不佳，需注意資金周轉。"
-        else: 
-            res = "⏳【中性觀望】目前數據處於平衡點，建議分批入場。"
-        st.info(f"**🤖 AI 決策判斷：** {res}")
+            # 第三排：財務過濾
+            t11, t12, t13, t14, t15 = st.columns(5)
+            t11.metric("速動比率", f"{round(d['quick']*100,1)}%")
+            t12.metric("流動比率", f"{round(d['curr']*100,1)}%")
+            t13.metric("現金殖利率", f"{round(d['div']*100,2)}%")
+            t14.metric("營收年增率", f"{round(d['rev']*100,1)}%")
+            t15.metric("近四季 EPS", f"{d['eps']} 元")
 
-        # 區塊四：股價走勢分析 (技術指標欄位)
+        # AI 診斷 (T 欄)
+        if d['roe'] > 0.18 and d['pos_52'] < 0.35: decision, color = "🌟 卓越成長：高獲利、低位階標的", "success"
+        elif safety > 0.1: decision, color = "🟢 安全邊際：價值低估，適合佈局", "success"
+        elif d['pos_52'] > 0.8: decision, color = "🟠 高度警戒：位階過高，暫不加倉", "warning"
+        elif d['roe'] < 0.08: decision, color = "🚫 暫不考慮：獲利品質未達標", "error"
+        else: decision, color = "⏳ 中性觀望：各項數據處於盤整區", "info"
+        
+        st.toast(decision)
+        getattr(st, color)(f"**🤖 AI 全方位決策洞察：** {decision}")
+
         st.divider()
-        st.subheader("📉 股價走勢與技術指標")
-        t1, t2, t3, t4 = st.columns(4)
-        latest_rsi = d['df']['RSI'].iloc[-1]
-        t1.write(f"**RSI (14):** {round(latest_rsi, 1)} {'🔥超買' if latest_rsi>70 else '❄️超賣' if latest_rsi<30 else ''}")
-        t2.write(f"**20MA 趨勢:** {'🌕多頭' if d['price'] > d['df']['MA20'].iloc[-1] else '🌑空頭'}")
-        t3.write(f"**生命線(60MA):** {round(d['df']['MA60'].iloc[-1], 1)}")
-        t4.write(f"**MACD 狀態:** {'📈金叉' if d['macd'].iloc[-1, 0] > d['macd'].iloc[-1, 1] else '📉死叉'}")
+
+        # --- 第二部分：股價走勢分析 ---
+        st.header("📉 股價走勢分析 (均線、量能、籌碼)")
+        
+        with st.container(border=True):
+            g1, g2, g3, g4 = st.columns(4)
+            # 均線區
+            with g1:
+                st.write("**【 均線與乖離 】**")
+                st.write(f"MA5 (週線): {round(d['df']['MA5'].iloc[-1],1)}")
+                st.write(f"MA20 (月線): {round(d['df']['MA20'].iloc[-1],1)}")
+                st.write(f"MA60 (季線): {round(d['df']['MA60'].iloc[-1],1)}")
+                bias = (d['price'] - d['df']['MA20'].iloc[-1]) / d['df']['MA20'].iloc[-1]
+                st.write(f"乖離率: {round(bias*100, 1)}% ({'過熱' if bias>0.1 else '超跌' if bias<-0.1 else '正常'})")
+
+            # 量能指標
+            with g2:
+                st.write("**【 量能與強弱 】**")
+                vol = d['df']['Volume'].iloc[-1]
+                avg_vol = d['df']['Volume'].tail(5).mean()
+                st.write(f"今日成交量: {int(vol/1000)} 張")
+                st.write(f"5日均量: {int(avg_vol/1000)} 張")
+                st.write(f"量能噴發比: {round(vol/avg_vol, 2)}x")
+            
+            # 動能指標
+            with g3:
+                st.write("**【 動能與指標 】**")
+                rsi = d['df']['RSI'].iloc[-1]
+                st.write(f"RSI(14): {round(rsi, 1)} ({'過熱' if rsi>70 else '超賣' if rsi<30 else '持平'})")
+                k = d['kd']['STOCHk_9_3_3'].iloc[-1]
+                d_val = d['kd']['STOCHd_9_3_3'].iloc[-1]
+                st.write(f"KD值: K {round(k,1)} / D {round(d_val,1)}")
+                st.write(f"KD狀態: {'多頭交叉' if k>d_val else '空頭交叉'}")
+
+            # 籌碼區與布林
+            with g4:
+                st.write("**【 籌碼與區間 】**")
+                st.write(f"布林上軌: {round(d['bol']['BBU_20_2.0'].iloc[-1], 1)}")
+                st.write(f"布林下軌: {round(d['bol']['BBL_20_2.0'].iloc[-1], 1)}")
+                st.write(f"走勢評等: {'🌕 強勢' if d['price'] > d['df']['MA20'].iloc[-1] else '🌑 弱勢'}")
+
+        # 技術診斷建議
+        st.subheader("💡 技術診斷與策略建議")
+        macd_val = d['macd']['MACD_12_26_9'].iloc[-1]
+        sig_val = d['macd']['MACDs_12_26_9'].iloc[-1]
+        
+        tech_advice = f"目前的 RSI 為 {round(rsi,1)}，"
+        if macd_val > sig_val: tech_advice += "MACD 柱狀體翻紅，趨勢偏多。"
+        else: tech_advice += "MACD 仍處於弱勢區間。"
+        
+        if bias > 0.08: tech_advice += " 乖離率過大，不建議在此時追高。"
+        elif rsi < 35: tech_advice += " 已進入超賣區，可觀察止跌訊號。"
+        
+        st.success(tech_advice)
 
     else:
-        st.error("找不到該代碼數據，請檢查代碼是否正確。")
+        st.error("無法抓取數據，請確認代碼是否正確。")
