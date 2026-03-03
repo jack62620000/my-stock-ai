@@ -11,11 +11,21 @@ st.set_page_config(page_title="家傳五星級存股戰情室", layout="wide")
 def get_stock_names():
     try:
         conn = st.connection("gsheets", type=GSheetsConnection)
-        # 讀取「代碼對照表」分頁
-        df_gsheet = conn.read(worksheet="代碼對照表").astype(str)
-        # 假設 A 欄代碼，B 欄中文名
-        return dict(zip(df_gsheet.iloc[:, 0].str.strip(), df_gsheet.iloc[:, 1].str.strip()))
-    except:
+        
+        # 1. 優先嘗試讀取獨立的「代碼對照表」工作表
+        try:
+            df_gsheet = conn.read(worksheet="代碼對照表").astype(str)
+            # 假設該表 A 欄為代碼，B 欄為名稱
+            return dict(zip(df_gsheet.iloc[:, 0].str.strip(), df_gsheet.iloc[:, 1].str.strip()))
+        except Exception:
+            # 2. 備案：若找不到，則從「台股分析」工作表擷取
+            # 根據資料顯示，台股分析表的 A 欄是代碼，B 欄是名稱 
+            df_main = conn.read(worksheet="台股分析").astype(str)
+            # 跳過前兩列標題/說明，從第 3 列開始讀取 
+            return dict(zip(df_main.iloc[2:, 0].str.strip(), df_main.iloc[2:, 1].str.strip()))
+            
+    except Exception as e:
+        st.sidebar.warning(f"⚠️ 名稱對照載入失敗：{str(e)[:30]}")
         return {}
 
 name_map = get_stock_names()
@@ -96,3 +106,4 @@ if code_input:
                 st.write(f"**20MA 走勢:** {'🌕 強勢' if price > df['Close'].rolling(20).mean().iloc[-1] else '🌑 盤整'}")
             with t3:
                 st.write(f"**今日成交量:** {int(df['Volume'].iloc[-1]/1000)} 張")
+
