@@ -4,7 +4,7 @@ import pandas as pd
 import pandas_ta as ta
 
 # 頁面配置
-st.set_page_config(page_title="台股五星級 AI 戰情室", layout="wide")
+st.set_page_config(page_title="台股AI戰情室", layout="wide")
 
 # --- 1. 自動化名稱抓取 ---
 @st.cache_data(ttl=86400)
@@ -162,3 +162,4 @@ if code_input:
 
     else:
         st.error("❌ 無法取得數據。請確認代碼（如 2330, 3131）是否正確，或稍後再試。")
+
