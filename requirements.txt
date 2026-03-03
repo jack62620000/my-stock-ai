@@ -3,5 +3,4 @@ yfinance
 pandas
 pandas_ta
 lxml
-gspread
-google-auth
+st-gsheets-connection
