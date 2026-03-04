@@ -175,17 +175,26 @@ if code_input:
                 st.write(f"走勢: {'🌕 強勢' if d['p'] > latest['MA20'] else '🌑 弱勢'}")
                 st.write(f"策略: {'持股續抱' if d['p'] > latest['MA20'] else '等待轉強'}")
 
-        # --- 第三部分：AI 終極戰情報告 ---
-        st.header("🤖 第三部分：AI 終極戰情診斷 (Gemini Pro)")
-        if st.button("🚀 啟動 AI 深度診斷"):
-            api_key = st.secrets.get("GEMINI_API_KEY")
-            if api_key:
-                with st.spinner(f"AI 正在根據資料庫為 {d['name']} 撰寫報告..."):
-                    report = get_ai_analysis_report(d, code_input, api_key)
+        # --- 第三部分：AI 終極戰情報告（最終版）---
+        st.header("🤖 第三部分：AI 終極戰情診斷 (Gemini 2.5 Flash)")
+        
+        # ✅ AI狀態檢查
+        api_status = st.secrets.get("GEMINI_API_KEY")
+        col1, col2 = st.columns([1, 4])
+        with col1:
+            status_icon = "🟢 已連線" if api_status else "🔴 未連線"
+            st.caption(f"**{status_icon}**")
+        with col2:
+            st.caption(f"**模型**：gemini-2.5-flash")
+        
+        if st.button("🚀 啟動 AI 深度診斷", type="primary", use_container_width=True):
+            if api_status:
+                with st.spinner(f"🤖 Gemini AI 分析 {d['name']} ({code_input})..."):
+                    report = get_ai_analysis_report(d, code_input, api_status)
+                    st.markdown("### 📋 **AI 終極投資報告**")
                     st.markdown("---")
                     st.markdown(report)
+                    st.balloons()
+                    st.success("✅ AI診斷完成！滾輪滑動看完整報告")
             else:
-                st.error("🔑 請先在 Streamlit Secrets 設定 API Key。")
-
-    else:
-        st.error("❌ 抓不到數據，請確認代碼是否正確。")
+                st.error("🔧 **設定Cloud Secrets**：\nApp Settings → Secrets → GEMINI_API_KEY")
