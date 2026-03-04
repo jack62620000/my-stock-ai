@@ -71,49 +71,65 @@ def get_comprehensive_data(code):
     return None
 
 # --- 3. AI 診斷報告函式 ---
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=86400) # 設定 24 小時快取，省點額度
 def get_ai_analysis_report(d, code, api_key):
     try:
+        # 1. 配置 API
         genai.configure(api_key=api_key.strip())
         
-        # --- 核心修復：自動偵測妳的 Key 擁有的模型路徑 ---
+        # 2. 自動偵測模型，並排除掉已經爆掉的 2.5 版本
         available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
         
-        # 改成更精準的排除法，避開 2.5：
-target_model = next((m for m in available_models if '1.5-flash' in m and '2.5' not in m), None)
-if not target_model:
-    target_model = next((m for m in available_models if '1.5-pro' in m), available_models[0])
+        # 優先尋找 1.5-flash 且名稱中不含 2.5 的模型
+        target_model = next((m for m in available_models if '1.5-flash' in m and '2.5' not in m), None)
         
-        # 如果找不到 1.5-flash，就抓清單中第一個可用的 (通常是 1.0 或 1.5-pro)
+        # 如果找不到 1.5-flash，嘗試 1.5-pro
         if not target_model:
-            target_model = available_models[0] if available_models else "models/gemini-pro"
+            target_model = next((m for m in available_models if '1.5-pro' in m), None)
+        
+        # 如果還是找不到，才隨便抓一個，或是報錯
+        if not target_model:
+            if available_models:
+                target_model = available_models[0]
+            else:
+                return "❌ 找不到任何可用模型，請檢查 API Key 權限。"
             
         model = genai.GenerativeModel(target_model)
-        # ----------------------------------------------
         
+        # 3. 準備 Prompt
         latest = d['df'].iloc[-1]
         k, dv = d['stoch'].iloc[-1, 0], d['stoch'].iloc[-1, 1]
         
-        prompt = f"""你現在是融合「巴菲特價值眼光」與「高盛策略師」的頂尖 AI 顧問。
-請針對股票：{d['name']} ({code}) 進行 2026 年度的深度分析報告。
+        prompt = f"""你現在是融合「巴菲特價值眼光」與「高盛首席策略分析師」的頂尖 AI 顧問。
+請針對股票：{d['name']} ({code}) 進行精確且多方面的專業分析報告。
 
-【當前關鍵數據庫】
-- 財務：現價 {round(d['p'],1)}, ROE {round(d['roe']*100,1)}%, 安全邊際 {round(d['safety']*100,1)}%
-- 技術：K值 {round(k,1)}, D值 {round(dv,1)}, RSI {round(latest['RSI'],1)}
-- 位階：52週位階 {round(d['pos_52']*100,1)}%
+【⚠️ 執行指令】：請直接從第 1 點開始輸出報告，嚴禁任何開場白、問候語或自我介紹。
 
-請嚴格依照以下結構輸出（嚴禁開場白）：
-1. 🌍【全球局勢與宏觀風險分析】：分析2026年全球局勢對該產業影響。
-2. 💎【巴菲特的內在價值審查】：從毛利與財務看護城河與定價權。
-3. 📉【股價走勢與動能判斷】：分析目前 K線、KD、RSI 透露的買賣訊號。
-4. 🎯【法人目標價與達成時間預估】：評估合理性並預測股價回歸時間點。
-5. 📈【終極投資策略建議】：給出長、短線進場價位與停損點建議。
-        """
+【當前關鍵數據】
+- 財務：現價 {round(d['price'],1)}元, ROE {round(d['roe']*100,2)}%, 毛利 {round(d['margin']*100,2)}%
+- 技術：K值 {round(k_val,1)}, D值 {round(d_val,1)}, RSI {round(lt['RSI'],1)}
+- 籌碼：近期法人/大戶買賣力道參考為「{d['inst_proxy']}」
 
+請嚴格依照以下結構輸出報告內容：
+
+1. 🌍【全球局勢與宏觀風險分析】：
+   分析2026年全球政經局勢（如美國關稅政策、供應鏈碎片化、通膨壓力等）對 {d['name']} 的具體影響，這家公司是否具備對抗全球波動的韌性？
+2. 💎【巴菲特的內在價值審查】：
+   從毛利與財務穩健度看，是否有寬廣護城河？護城河有哪些？全球市佔率預估是多少？在目前通膨環境下是否具備「定價權」？
+3. 📉【股價走勢與動能判斷】：
+   目前的 K線、KD、MACD、RSI 透露什麼買賣訊號？目前股價是反應基本面價值，還是處於市場情緒的過度波動？分析大戶及法人買賣趨勢。
+4. 🎯【法人目標價與達成時間預估】：
+   分析法人平均目標價 {d['target_mean'] if d['target_mean'] else 'N/A'} 的合理性。預估股價達到合理價的預測時間，並說明預測理由。
+5. 📈【終極投資策略建議】：
+   給出具體的「長線持有」或「短線避險」建議。請提供長線及短線進場股價及停損點股價。"""
+
+        # 4. 執行分析
         response = model.generate_content(prompt)
         return response.text
+
     except Exception as e:
-        return f"AI 診斷失敗，請確認 API Key 是否正確或額度已滿。錯誤細節：{str(e)}"
+        # 這裡就是妳剛才漏掉的 except 區塊
+        return f"⚠️ 診斷發生錯誤：{str(e)}"
 
 # --- 4. UI 介面 ---
 code_input = st.sidebar.text_input("🔍 輸入台股代碼", placeholder="3131").strip()
@@ -190,4 +206,5 @@ if code_input:
 
     else:
         st.error("❌ 抓不到數據，請確認代碼是否正確。")
+
 
