@@ -123,7 +123,7 @@ if code_input:
             with st.spinner(f'AI 正在分析 {data["name"]}...'):
                 ans, m_name = get_buffett_pro_analysis(data, code_input, api_key)
                 if m_name:
-                    st.markdown(f"### 🛡️ 診斷報告：{data['name']} ({code_input})")
+                    st.markdown(f"### 🛡️ AI分析報告：{data['name']} ({code_input})")
                     st.write(ans)
                 else:
                     st.error(f"⚠️ 錯誤：{ans}")
@@ -131,3 +131,4 @@ if code_input:
             st.error("🔑 請設定 API Key")
     else:
         st.warning("❌ 抓不到數據，請確認代碼。")
+
