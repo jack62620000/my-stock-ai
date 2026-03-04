@@ -64,39 +64,32 @@ if code_input:
             else:
                 t3.warning("空頭整理")
 
-        # --- 第三部分：Gemini AI 偵測診斷 ---
+        # --- 找到第三部分 AI 區塊，直接替換為這段 ---
         st.divider()
         st.subheader("🤖 Gemini AI 專家點評")
         
         api_key = st.secrets.get("GEMINI_API_KEY")
         if api_key:
             try:
+                # 1. 配置 Key
                 genai.configure(api_key=api_key)
-                # 這裡改用最保險的呼叫方式
+                
+                # 2. 強制指定模型 (請確保完全手打，不要複製奇怪的格式)
                 model = genai.GenerativeModel('gemini-1.5-flash')
                 
-                # 準備測試 Prompt
-                test_prompt = f"請分析台股{code_input}，用30字給出建議。"
+                # 3. 簡化 Prompt 測試
+                prompt = f"請針對台股 {code_input} 提供一句 30 字內的投資策略建議。"
                 
-                # 執行呼叫
-                response = model.generate_content(test_prompt)
+                # 4. 取得回應
+                response = model.generate_content(prompt)
                 
-                if response.text:
+                if response and response.text:
                     st.info(response.text)
                 else:
-                    st.warning("AI 已連線但未回傳文字。")
+                    st.warning("AI 目前沒有回傳建議，請稍後再試。")
                     
             except Exception as e:
-                # 這是關鍵！它會顯示真正發生什麼事
-                error_msg = str(e)
-                if "API_KEY_INVALID" in error_msg:
-                    st.error("❌ API Key 無效，請確認 Secrets 中的 Key 是否複製完整。")
-                elif "404" in error_msg:
-                    st.error("❌ 找不到模型，請確認模型名稱是否正確（建議使用 gemini-1.5-flash）。")
-                elif "User location is not supported" in error_msg:
-                    st.error("❌ 您的 API Key 地區受限。")
-                else:
-                    st.error(f"⚠️ AI 出現預料外的錯誤：{error_msg}")
+                # 如果還是失敗，顯示最精簡的錯誤訊息
+                st.error(f"連線成功但呼叫失敗：{str(e)}")
         else:
-            st.error("🔑 尚未在 Secrets 中設定 GEMINI_API_KEY")
-
+            st.error("🔑 請在 Secrets 中設定 GEMINI_API_KEY")
