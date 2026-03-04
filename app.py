@@ -4,12 +4,42 @@ import pandas as pd
 import pandas_ta as ta
 import google.generativeai as genai
 
-# ========= 🎨 完美樣式 =========
+# ========= 🎨 完美統一文字大小 =========
 st.markdown("""
 <style>
+/* 標題 */
 h1 { font-size: 2.2rem !important; margin-bottom: 1rem !important; }
 h2, h3 { font-size: 1.6rem !important; margin: 0.3rem 0 0.5rem 0 !important; }
-.st-emotion-cache-1r4fnda { padding: 0.5rem 1rem !important; margin-bottom: 0.3rem !important; }
+
+/* 容器框內文字統一 */
+.st-emotion-cache-1r4fnda {
+    padding: 0.8rem 1.2rem !important;
+    margin-bottom: 0.5rem !important;
+}
+
+/* Metric文字統一 */
+.metric-container { 
+    font-size: 1.0rem !important; 
+    margin-bottom: 0.3rem !important; 
+}
+.metric-value { 
+    font-size: 1.4rem !important; 
+}
+.metric-label { 
+    font-size: 0.85rem !important; 
+}
+
+/* 一般文字統一 */
+div[data-testid="column"] p, div[data-testid="column"] div {
+    font-size: 0.95rem !important;
+    line-height: 1.3 !important;
+}
+
+/* 解決st.write大小問題 */
+.element-container p {
+    font-size: 0.95rem !important;
+    margin: 0.2rem 0 !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -113,44 +143,34 @@ if code_input:
     if d:
         st.title(f"📊 {d['name']} ({code_input})")
         
-        # 第一部分
-        st.header("📋 基本面與估值")
-        with st.container(border=True):
-            v1, v2, v3, v4 = st.columns(4)
-            v1.metric("現價", f"{round(d['p'], 1)} 元")
-            v2.metric("合理價", f"{round(d['intrinsic'], 1)} 元", f"PE: {d['pe_b']}")
-            v3.metric("安全邊際", f"{round(d['safety']*100, 1)}%")
-            v4.metric("52週位階", f"{round(d['pos_52']*100, 1)}%")
-            
-            st.markdown(" ")
-            f1, f2, f3, f4 = st.columns(4)
-            with f1:
-                roe_pct = round(d['roe']*100,1)
-                roe_delta = round((d['roe']*100-15),1)
-                v1.metric("ROE", f"{roe_pct}%", f"{roe_delta:+.1f}%")
-            with f2:
-                fcf_color = "🟢正" if d['fcf']>0 else "🔴負"
-                st.metric("現金流", f"{round(d['fcf'],1)}億", fcf_color)
-            with f3: st.metric("營收年增", f"{round(d['rev']*100,1)}%")
-            with f4:
-                if d['roe'] > 0.18: st.success("🌟 卓越成長")
-                elif d['safety'] > 0.1: st.success("🟢 價值低估")
-                else: st.info("⏳ 觀望")
+        # 第一部分：全Metric版
+st.header("📋 基本面與估值")
+with st.container(border=True):
+    v1, v2, v3, v4 = st.columns(4)
+    v1.metric("現價", f"${round(d['p'], 1):,.0f}")
+    v2.metric("合理價", f"${round(d['intrinsic'], 1):,.0f}", f"PE{d['pe_b']:.1f}")
+    v3.metric("安全邊際", f"{d['safety']*100:.1f}%")
+    v4.metric("52週", f"{d['pos_52']*100:.1f}%")
+    
+    st.markdown(" ") 
+    f1, f2, f3, f4 = st.columns(4)
+    f1.metric("ROE", f"{d['roe']*100:.1f}%")
+    f2.metric("現金流", f"{d['fcf']:.1f}億")
+    f3.metric("營收成長", f"{d['rev']*100:.1f}%")
+    f4.metric("決策", "🟢買入" if d['safety']>0.1 else "⏳觀望")
         
-        # 第二部分
-        st.markdown(" ")
-        st.header("📉 技術面分析")
-        df, latest = d['df'], d['df'].iloc[-1]
-        with st.container(border=True):
-            t1, t2, t3, t4 = st.columns(4)
-            with t1:
-                bias = (d['p'] / latest['MA20'] - 1) * 100
-                st.metric("MA20乖離", f"{round(bias, 1)}%")
-            with t2: st.metric("RSI", f"{round(latest['RSI'], 1)}")
-            with t3:
-                k, dv = d['stoch'].iloc[-1, 0], d['stoch'].iloc[-1, 1]
-                st.metric("KD", f"K{round(k,1)}")
-            with t4: st.metric("趨勢", "強勢" if d['p'] > latest['MA20'] else "弱勢")
+        # 第二部分：全Metric版  
+st.markdown(" ")
+st.header("📉 技術面分析")
+df, latest = d['df'], d['df'].iloc[-1]
+with st.container(border=True):
+    t1, t2, t3, t4 = st.columns(4)
+    bias = (d['p'] / latest['MA20'] - 1) * 100
+    t1.metric("月線乖離", f"{bias:.1f}%")
+    t2.metric("RSI", f"{latest['RSI']:.0f}")
+    k, dv = d['stoch'].iloc[-1, 0], d['stoch'].iloc[-1, 1]
+    t3.metric("KD", f"K{k:.0f}")
+    t4.metric("趨勢", "強勢" if d['p'] > latest['MA20'] else "弱勢")
         
         # 第三部分
         st.markdown(" ")
@@ -171,3 +191,4 @@ if code_input:
                 st.error("🔧 Settings → Secrets → GEMINI_API_KEY")
     else:
         st.error("❌ 請確認股票代碼（如2330）")
+
