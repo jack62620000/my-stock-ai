@@ -76,17 +76,22 @@ def get_comprehensive_data(code):
 @st.cache_data(ttl=86400)
 def get_ai_analysis_report(d, code, api_key):
     try:
-        # 1. 初始化配置
         genai.configure(api_key=api_key.strip())
         
-        # 2. 絕對路徑修正：直接使用純字串名稱
-        # 這是最不容易觸發 404 models/models/ 重複路徑的寫法
-        model_name = 'gemini-1.5-flash' 
+        # --- 核心修正：嘗試三種最可能的名稱格式 ---
+        # 1. 最標準的正式版名稱
+        # 2. 加上 models/ 前綴的名稱
+        # 3. 備援的穩定版 (gemini-pro)
         
-        # 如果你之前一直報 404，可以試試看把上面這行換成 'gemini-pro'
-        model = genai.GenerativeModel(model_name)
-        
-        # 3. 準備數據 (確保與 get_comprehensive_data 字典 Key 完全一致)
+        try:
+            model = genai.GenerativeModel('gemini-1.5-flash')
+        except:
+            try:
+                model = genai.GenerativeModel('models/gemini-1.5-flash')
+            except:
+                model = genai.GenerativeModel('gemini-pro') 
+
+        # --- 以下 Prompt 邏輯保持不變 ---
         lt = d['df'].iloc[-1]
         k_val = d['stoch'].iloc[-1, 0]
         d_val = d['stoch'].iloc[-1, 1]
@@ -114,12 +119,10 @@ def get_ai_analysis_report(d, code, api_key):
 5. 📈【終極投資策略建議】：
    給出具體的「長線持有」或「短線避險」建議。請提供長線及短線進場股價及停損點股價。"""
 
-        # 4. 執行生成
         response = model.generate_content(prompt)
         return response.text
 
     except Exception as e:
-        # 捕捉細節：如果還是報錯，讓你知道是哪邊斷掉
         return f"⚠️ AI 診斷目前無法連線：{str(e)}"
 
 # --- 4. UI 介面 ---
@@ -197,6 +200,7 @@ if code_input:
 
     else:
         st.error("❌ 抓不到數據，請確認代碼是否正確。")
+
 
 
 
