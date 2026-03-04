@@ -158,28 +158,26 @@ if code_input:
     if d:
         st.title(f"📊 {d['name']} ({code_input})")
         
-        # 第一部分：安全版2列6欄（無任何KeyError）
-st.header("📋 基本面與估值")
-with st.container(border=True):
-    # 第1列：確定存在的6個
-    c1, c2, c3, c4, c5, c6 = st.columns(6)
-    c1.metric("現價", f"${round(d['p'], 1):,.0f}")
-    c2.metric("合理價", f"${round(d['intrinsic'], 1):,.0f}")
-    c3.metric("安全邊際", f"{d['safety']*100:.1f}%")
-    c4.metric("52週位階", f"{d['pos_52']*100:.1f}%")
-    c5.metric("ROE", f"{d['roe']*100:.1f}%")
-    c6.metric("毛利率", f"{d['gp']*100:.1f}%")
-    
-    st.markdown(" ")
-    
-    # 第2列：確定存在的6個
-    f1, f2, f3, f4, f5, f6 = st.columns(6)
-    f1.metric("負債比率", f"{d['debt']*100:.1f}%")
-    f2.metric("現金流", f"{d['fcf']:.1f}億")
-    f3.metric("營收成長", f"{d['rev']*100:.1f}%")
-    f4.metric("EPS", f"{d['eps']:.1f}")
-    f5.metric("殖利率", f"{d['div']*100:.2f}%")
-    f6.metric("決策", "🟢買入" if d['safety']>0.1 else "⏳觀望")
+        # 第一部分：安全版（縮排100%正確）
+        st.header("📋 基本面與估值")
+        with st.container(border=True):
+            c1, c2, c3, c4, c5, c6 = st.columns(6)
+            c1.metric("現價", f"${round(d['p'], 1):,.0f}")
+            c2.metric("合理價", f"${round(d['intrinsic'], 1):,.0f}")
+            c3.metric("安全邊際", f"{d['safety']*100:.1f}%")
+            c4.metric("52週位階", f"{d['pos_52']*100:.1f}%")
+            c5.metric("ROE", f"{d['roe']*100:.1f}%")
+            c6.metric("毛利率", f"{d['gp']*100:.1f}%")
+
+            st.markdown(" ")  # ← 關鍵！12格縮排（與columns相同）
+            
+            f1, f2, f3, f4, f5, f6 = st.columns(6)
+            f1.metric("負債比率", f"{d['debt']*100:.1f}%")
+            f2.metric("現金流", f"{d['fcf']:.1f}億")
+            f3.metric("營收成長", f"{d['rev']*100:.1f}%")
+            f4.metric("EPS", f"{d['eps']:.1f}")
+            f5.metric("殖利率", f"{d['div']*100:.2f}%")
+            f6.metric("決策", "🟢買入" if d['safety']>0.1 else "⏳觀望")
 
         # 第二部分：技術面分析（正確縮排）
         st.markdown(" ")
@@ -213,6 +211,7 @@ with st.container(border=True):
                 st.error("🔧 Settings → Secrets → GEMINI_API_KEY")
     else:
         st.error("❌ 請確認股票代碼（如2330）")
+
 
 
 
