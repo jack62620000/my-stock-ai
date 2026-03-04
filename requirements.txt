@@ -2,5 +2,5 @@ streamlit
 yfinance
 pandas
 pandas_ta
+google-generativeai
 lxml
-st-gsheets-connection
