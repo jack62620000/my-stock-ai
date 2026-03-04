@@ -1,101 +1,73 @@
 import streamlit as st
 import yfinance as yf
-import pandas as pd
 import google.generativeai as genai
 import time
 
-# 1. 頁面基礎設定
+# 1. 頁面標題
 st.set_page_config(page_title="台股 AI 智慧分析", layout="centered")
 st.title("🤖 台股 AI 專家診斷")
-st.caption("輸入代碼，由 Gemini AI 為您提供即時投資點評")
 
-# 2. 數據抓取函式 (強化穩定度)
+# 2. 側邊欄：手動重新整理按鈕
+if st.sidebar.button("🧹 清除快取並重試"):
+    st.cache_data.clear()
+    st.rerun()
+
+# 3. 數據抓取 (保持穩定)
 def get_clean_data(code):
-    # 優先嘗試 .TWO (上櫃) 再嘗試 .TW (上市)
     for suffix in [".TWO", ".TW"]:
         try:
-            ticker = yf.Ticker(f"{code}{suffix}")
-            # 抓取 1 個月歷史股價
-            hist = ticker.history(period="1mo")
+            t = yf.Ticker(f"{code}{suffix}")
+            hist = t.history(period="1mo")
             if hist.empty: continue
-            
-            # 抓取基本面資料
-            try:
-                info = ticker.info
-                name = info.get('shortName') or info.get('longName') or f"股票 {code}"
-                roe = info.get('returnOnEquity', 0)
-            except:
-                name = f"股票 {code}"
-                roe = 0
-                
+            info = t.info
             return {
-                "name": name,
+                "name": info.get('shortName') or info.get('longName') or f"股票 {code}",
                 "price": hist['Close'].iloc[-1],
-                "roe": roe
+                "roe": info.get('returnOnEquity', 0)
             }
-        except:
-            continue
+        except: continue
     return None
 
-# 3. 側邊欄與輸入
-code = st.text_input("🔍 請輸入台股代碼 (例如: 2330, 3131, 2317)", value="3131").strip()
-
-# 4. 執行與顯示邏輯
-if code:
-    with st.spinner('AI 正在讀取數據並撰寫報告...'):
-        data = get_clean_data(code)
+# 4. AI 分析函式 (加入快取機制：同代碼 10 分鐘內不重問)
+@st.cache_data(ttl=600)
+def get_ai_response(name, code, price, roe, api_key):
+    try:
+        genai.configure(api_key=api_key.strip())
         
-        if data:
-            # 從 Streamlit Secrets 取得 API KEY
-            api_key = st.secrets.get("GEMINI_API_KEY")
-            
-            if api_key:
-                try:
-                    # 配置 Gemini
-                    genai.configure(api_key=api_key.strip())
-                    
-                    # --- 自動偵測可用模型 (解決 404 錯誤) ---
-                    available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-                    
-                    if available_models:
-                        # 挑選順序：1.5-flash > 1.5-pro > 1.0-pro > 第一個可用模型
-                        target_model = next((m for m in available_models if '1.5-flash' in m), 
-                                          next((m for m in available_models if '1.5-pro' in m), 
-                                          next((m for m in available_models if 'gemini-pro' in m), 
-                                          available_models[0])))
-                        
-                        model = genai.GenerativeModel(target_model)
-                        
-                        # AI 分析指令 (Prompt)
-                        prompt = f"""
-                        你是資深台股分析師。
-                        分析標的：{data['name']}({code})
-                        目前股價：{round(data['price'], 1)} 元
-                        ROE (股東權益報酬率)：{round(data['roe']*100, 2)}%
-                        
-                        請用 40 字以內，給出精簡且具參考價值的短線與長線建議。
-                        """
-                        
-                        response = model.generate_content(prompt)
-                        
-                        # 顯示分析結果
-                        st.success(f"### 📋 {data['name']} ({code}) 診斷結果")
-                        st.info(response.text)
-                        st.caption(f"使用模型版本: {target_model.split('/')[-1]}")
-                        
-                    else:
-                        st.error("❌ 您的 API Key 目前沒有可用模型，請確認 Google AI Studio 權限。")
-                        
-                except Exception as e:
-                    err_msg = str(e)
-                    if "429" in err_msg:
-                        st.error("⚠️ AI 暫時忙碌中（次數限制），請等待 60 秒後再重試。")
-                    else:
-                        st.error(f"⚠️ AI 連線細節：{err_msg}")
-            else:
-                st.error("🔑 尚未在 Streamlit Cloud 的 Settings > Secrets 設定 GEMINI_API_KEY")
-        else:
-            st.warning(f"❌ 暫時抓不到代碼 {code} 的數據。請確認代碼是否正確，或稍後再試。")
+        # 自動偵測模型
+        available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        target_model = next((m for m in available_models if '1.5-flash' in m), available_models[0])
+        
+        model = genai.GenerativeModel(target_model)
+        prompt = f"你是台股分析師。分析{name}({code})，現價{round(price, 1)}元，ROE為{round(roe*100,2)}%。請給出40字內操作建議。"
+        
+        response = model.generate_content(prompt)
+        return response.text, target_model
+    except Exception as e:
+        return str(e), None
 
-st.divider()
-st.caption("💡 提示：若出現連線錯誤，請點擊網頁右上角 '...' 中的 'Rerun'。")
+# 5. 主要執行邏輯
+code_input = st.text_input("🔍 請輸入台股代碼", value="3131").strip()
+
+if code_input:
+    data = get_clean_data(code_input)
+    
+    if data:
+        api_key = st.secrets.get("GEMINI_API_KEY")
+        if api_key:
+            # 呼叫帶有快取的 AI 函式
+            ai_text, model_name = get_ai_response(data['name'], code_input, data['price'], data['roe'], api_key)
+            
+            if model_name: # 代表成功
+                st.success(f"### 📋 {data['name']} ({code_input}) 診斷結果")
+                st.info(ai_text)
+                st.caption(f"模型: {model_name}")
+            else: # 代表失敗
+                if "429" in ai_text:
+                    st.error("⚠️ Google API 額度已滿。請點擊左側『清除快取』並等 60 秒再試。")
+                else:
+                    st.error(f"⚠️ 連線錯誤：{ai_text}")
+        else:
+            st.error("🔑 請設定 API Key")
+    else:
+        st.warning("❌ 抓不到數據，請確認代碼。")
