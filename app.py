@@ -3,6 +3,7 @@ import yfinance as yf
 import pandas as pd
 import pandas_ta as ta
 import google.generativeai as genai
+import numpy as np
 
 # ========= 🎨 完美統一文字大小 =========
 st.markdown("""
@@ -56,7 +57,7 @@ def get_all_names():
                 if '　' in str(item):
                     p = str(item).split('　')
                     if len(p) >= 2: names[p[0].strip()] = p[1].strip()
-    except: pass  # lxml錯誤忽略
+    except: pass
     return names
 
 name_map = get_all_names()
@@ -64,7 +65,7 @@ name_map = get_all_names()
 st.sidebar.markdown("### 📈 **台股AI診斷**")
 st.sidebar.markdown("---")
 
-# --- 2. 核心數據 ---
+# --- 2. 核心數據（🔥 完整修正版）---
 @st.cache_data(ttl=300)
 def get_comprehensive_data(code):
     for suffix in [".TW", ".TWO"]:
@@ -76,7 +77,7 @@ def get_comprehensive_data(code):
             
             price = hist['Close'].iloc[-1]
             
-            # 🔥 完整財報數據（30+項）
+            # 🔥 完整財報數據
             financials = {
                 # 價格與估值
                 'p': price,
@@ -113,39 +114,65 @@ def get_comprehensive_data(code):
                 'dividend_yield': info.get('dividendYield', 0),
                 'payout_ratio': info.get('payoutRatio', 0),
                 
-                # 技術面
+                # 技術面原始數據
                 'df': hist,
-                'name': name_map.get(code, code)
+                'name': name_map.get(code, code),
+                'info': info  # 🔥 保留完整info
             }
+            
+            # 🔥 計算所有必要技術指標
+            df = hist.copy()
+            
+            # 均線
+            df['MA20'] = ta.sma(df['Close'], length=20)
+            
+            # RSI
+            df['RSI'] = ta.rsi(df['Close'], length=14)
+            
+            # KD指標
+            stoch = ta.stoch(df['High'], df['Low'], df['Close'])
+            if stoch is not None and not stoch.empty:
+                df['stoch'] = stoch['STOCHk_14_3_3']
+                df['stochd'] = stoch['STOCHd_14_3_3']
+            else:
+                df['stoch'] = 50  # 預設值
+                df['stochd'] = 50
             
             # 計算衍生數據
             financials['pe_ratio'] = price / max(financials['eps'], 0.01)
-            
-            # 技術指標
-            df = hist.copy()
-            df['RSI'] = ta.rsi(df['Close'], length=14)
             financials['rsi'] = df['RSI'].iloc[-1]
             financials['df'] = df
             
+            # 🔥 補齊財報顯示所需欄位（使用安全預設值）
+            financials.update({
+                'gp': financials['gross_margin'],
+                'op': financials['operating_margin'],
+                'debt': financials['debt_to_equity'],
+                'rev': financials['revenue_growth'],
+                'div': financials['dividend_yield']
+            })
+            
             return financials
             
-        except: continue
+        except Exception:
+            continue
     return None
 
-# --- 3. AI報告 ---
+# --- 3. AI報告（修正）---
 @st.cache_data(ttl=86400)
 def get_ai_analysis_report(d, code, api_key):
     try:
         genai.configure(api_key=api_key.strip())
         model = genai.GenerativeModel('gemini-2.5-flash')
         
-        lt = d['df'].iloc[-1]
-        k_val = d['stoch'].iloc[-1, 0]
-        d_val = d['stoch'].iloc[-1, 1]
+        df = d['df']
+        latest = df.iloc[-1]
+        k_val = latest.get('stoch', 50)
+        d_val = latest.get('stochd', 50)
         
         prompt = f"""針對 {d['name']} ({code})：
 現價 {round(d['p'], 1)}元, ROE {round(d['roe']*100, 2)}%
-K值 {round(k_val, 1)}, RSI {round(lt['RSI'], 1)}
+K值 {round(k_val, 1)}, RSI {round(latest.get('RSI', 50), 1)}
 合理價 {round(d['intrinsic'], 1)}元
 
 請依序回答：
@@ -161,14 +188,16 @@ K值 {round(k_val, 1)}, RSI {round(lt['RSI'], 1)}
         return f"⚠️ AI錯誤：{str(e)[:80]}"
 
 # --- 4. UI ---
-code_input = st.sidebar.text_input("🔍 輸入台股代碼", placeholder="2330").strip()
+code_input = st.sidebar.text_input("🔍 輸入台股代碼", placeholder="2330").strip().upper()
 
 if code_input:
-    d = get_comprehensive_data(code_input)
+    with st.spinner(f'🔄 正在分析 {code_input}...'):
+        d = get_comprehensive_data(code_input)
+    
     if d:
         st.title(f"📊 {d.get('name', code_input)} ({code_input})")
         
-        # 第一部分：5列7欄（100%安全）
+        # 第一部分：完整財報（修正）
         st.header("📋 第一部分：完整財報")
         with st.container(border=True):
             # 第1列
@@ -192,18 +221,14 @@ if code_input:
             f4.metric("現金流", f"{d.get('fcf',0):.1f}億")
             f5.metric("營收成長", f"{d.get('rev',0)*100:.1f}%")
             f6.metric("殖利率", f"{d.get('div',0)*100:.1f}%")
-            
-            # RSI安全計算
-            rsi_val = 50
-            if 'df' in d and 'RSI' in d['df'].columns:
-                rsi_val = d['df']['RSI'].iloc[-1]
+            rsi_val = d.get('df', pd.DataFrame()).get('RSI', pd.Series([50])).iloc[-1] if not d.get('df', pd.DataFrame()).empty else 50
             f7.metric("RSI", f"{rsi_val:.0f}")
 
             st.markdown(" ")
 
-            # 第3列：使用 d.get() 或 info.get()
-            info = yf.Ticker(f"{code_input}.TW").info if 'yf' not in locals() else {}
+            # 第3列
             s1,s2,s3,s4,s5,s6,s7 = st.columns(7)
+            info = d.get('info', {})
             s1.metric("流動比率", f"{info.get('currentRatio','N/A')}")
             s2.metric("速動比率", f"{info.get('quickRatio','N/A')}")
             s3.metric("淨利率", f"{info.get('profitMargins',0)*100:.1f}%")
@@ -212,35 +237,44 @@ if code_input:
             s6.metric("P/B", f"{info.get('priceToBook',0):.1f}x")
             s7.metric("PEG", f"{info.get('pegRatio','N/A')}")
 
-        # ========== 第二部分：技術面（原有） ==========
+        # 第二部分：技術面（修正）
         st.markdown(" ")
         st.header("📉 第二部分：股價走勢與動能分析")
-        df, latest = d['df'], d['df'].iloc[-1]
-        with st.container(border=True):
-            t1, t2, t3, t4 = st.columns(4)
-            with t1:
-                st.write("**【 均線系統 】**")
-                st.write(f"MA20: {round(latest['MA20'], 1)}")
-                bias = (d['p'] / latest['MA20'] - 1) * 100
-                st.write(f"乖離: {round(bias, 1)}%")
-            with t2:
-                st.write("**【 量能強弱 】**")
-                st.write(f"成交: {int(latest['Volume']/1000)}張")
-                st.write(f"RSI: {round(latest['RSI'], 1)}")
-            with t3:
-                k, dv = d['stoch'].iloc[-1, 0], d['stoch'].iloc[-1, 1]
-                st.write("**【 動能指標 】**")
-                st.write(f"KD: K{round(k,1)} / D{round(dv,1)}")
-                st.write(f"{'🔥金叉' if k>dv else '❄️死叉'}")
-            with t4:
-                st.write("**【 趨勢判定 】**")
-                st.write(f"{'🌕 強勢' if d['p'] > latest['MA20'] else '🌑 弱勢'}")
-                st.write(f"{'持股續抱' if d['p'] > latest['MA20'] else '等待轉強'}")
+        df = d.get('df', pd.DataFrame())
+        if not df.empty:
+            latest = df.iloc[-1]
+            price = d.get('p', 0)
+            
+            with st.container(border=True):
+                t1, t2, t3, t4 = st.columns(4)
+                with t1:
+                    st.write("**【 均線系統 】**")
+                    ma20 = latest.get('MA20', price)
+                    st.write(f"MA20: {round(ma20, 1)}")
+                    bias = (price / ma20 - 1) * 100 if ma20 > 0 else 0
+                    st.write(f"乖離: {round(bias, 1)}%")
+                with t2:
+                    st.write("**【 量能強弱 】**")
+                    st.write(f"成交: {int(latest.get('Volume',0)/1000)}張")
+                    st.write(f"RSI: {round(latest.get('RSI',50), 1)}")
+                with t3:
+                    k, dv = latest.get('stoch',50), latest.get('stochd',50)
+                    st.write("**【 動能指標 】**")
+                    st.write(f"KD: K{round(k,1)} / D{round(dv,1)}")
+                    st.write(f"{'🔥金叉' if k>dv else '❄️死叉'}")
+                with t4:
+                    st.write("**【 趨勢判定 】**")
+                    trend = "🌕 強勢" if price > ma20 else "🌑 弱勢"
+                    advice = "持股續抱" if price > ma20 else "等待轉強"
+                    st.write(trend)
+                    st.write(advice)
+        else:
+            st.warning("⚠️ 無法取得技術面數據")
 
-        # ========== 第三部分：AI診斷（原有） ==========
+        # 第三部分：AI診斷
         st.markdown(" ")
         st.header("🤖 第三部分：AI 終極戰情診斷")
-        api_status = st.secrets.get("GEMINI_API_KEY")
+        api_status = st.secrets.get("GEMINI_API_KEY", "")
         col1, col2 = st.columns([1, 4])
         with col1:
             status_icon = "🟢 已連線" if api_status else "🔴 未連線"
@@ -260,15 +294,4 @@ if code_input:
             else:
                 st.error("🔧 **設定Cloud Secrets**：App Settings → Secrets → GEMINI_API_KEY")
     else:
-        st.error("❌ 請確認股票代碼（如2330、2317）")
-
-
-
-
-
-
-
-
-
-
-
+        st.error("❌ 請確認股票代碼（如2330、2317），支援 .TW 和 .TWO")
