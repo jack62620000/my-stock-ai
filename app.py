@@ -5,7 +5,7 @@ import pandas_ta as ta
 import google.generativeai as genai
 
 # 頁面配置
-st.set_page_config(page_title="台股 AI 終極戰情室", layout="wide")
+st.set_page_config(page_title="台股分析", layout="wide")
 
 # --- 1. 名稱抓取 ---
 @st.cache_data(ttl=86400)
@@ -209,6 +209,7 @@ if code_input:
 
     else:
         st.error("❌ 抓不到數據，請確認代碼是否正確。")
+
 
 
 
