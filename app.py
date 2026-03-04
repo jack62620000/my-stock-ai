@@ -79,11 +79,11 @@ def get_ai_analysis_report(d, code, api_key):
         # 1. 配置 API
         genai.configure(api_key=api_key.strip())
         
-        # 2. 直接指定模型名稱（不加任何 models/ 或 v1beta/ 前綴）
-        # 這是最不容易噴 404 的寫法
+        # 2. 強制指定最穩定的模型名稱 (不加 models/ 前綴)
+        # 這是目前最能避開 404 錯誤的寫法
         model = genai.GenerativeModel('gemini-1.5-flash') 
         
-        # 3. 準備 Prompt (確保數據名稱對齊)
+        # 3. 準備數據 (確保與 get_comprehensive_data 完全對齊)
         lt = d['df'].iloc[-1]
         k_val = d['stoch'].iloc[-1, 0]
         d_val = d['stoch'].iloc[-1, 1]
@@ -111,12 +111,12 @@ def get_ai_analysis_report(d, code, api_key):
 5. 📈【終極投資策略建議】：
    給出具體的「長線持有」或「短線避險」建議。請提供長線及短線進場股價及停損點股價。"""
 
-        # 4. 執行
+        # 4. 執行生成
         response = model.generate_content(prompt)
         return response.text
 
     except Exception as e:
-        # 如果還是 404，這裡會捕捉到
+        # 捕捉細節，看看到底是額度還是路徑問題
         return f"⚠️ 診斷發生錯誤：{str(e)}"
 
 # --- 4. UI 介面 ---
@@ -194,6 +194,7 @@ if code_input:
 
     else:
         st.error("❌ 抓不到數據，請確認代碼是否正確。")
+
 
 
 
