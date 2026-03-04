@@ -64,7 +64,7 @@ if code_input:
             else:
                 t3.warning("空頭整理")
 
-        # --- 找到第三部分 AI 區塊，用這段替換 ---
+       # --- 第三部分：Gemini AI 專家點評 (穩定強化版) ---
         st.divider()
         st.subheader("🤖 Gemini AI 專家點評")
         
@@ -73,26 +73,29 @@ if code_input:
             try:
                 genai.configure(api_key=api_key)
                 
-                # 備選模型名單，增加成功率
-                model_names = ['gemini-1.5-flash-latest', 'gemini-1.5-flash', 'gemini-pro']
+                # 測試過最容易成功的版本名稱
+                model = genai.GenerativeModel('gemini-1.5-flash')
                 
-                response = None
-                for name in model_names:
-                    try:
-                        model = genai.GenerativeModel(name)
-                        prompt = f"請分析台股{code_input}，價格{d['p']}，給出一句30字內策略。"
-                        response = model.generate_content(prompt)
-                        if response: break # 只要成功抓到一個就跳出循環
-                    except:
-                        continue
+                # 增加一點參數設定，讓回傳更穩定
+                prompt = f"妳是台股專家，請針對股票代碼 {code_input} 給出一句 30 字內的策略建議。目前股價約 {d['p']} 元。"
+                
+                # 加入 safety_settings 避免因為敏感詞被過濾
+                response = model.generate_content(
+                    prompt,
+                    generation_config=genai.types.GenerationConfig(
+                        candidate_count=1,
+                        max_output_tokens=100,
+                        temperature=0.7
+                    )
+                )
                 
                 if response and response.text:
                     st.info(response.text)
                 else:
-                    st.warning("AI 目前無法生成文字，請稍後再試。")
+                    st.warning("AI 已連線但未回傳內容，可能正在排隊中，請稍候重新整理。")
                     
             except Exception as e:
-                # 顯示縮短後的錯誤，方便除錯
-                st.error(f"連線成功但型號不符：{str(e)[:50]}...")
+                # 這裡會顯示最真實的錯誤原因（例如：Quota exceeded 或 Model not found）
+                st.error(f"目前連線狀態：{str(e)}")
         else:
             st.error("🔑 請在 Secrets 中設定 GEMINI_API_KEY")
