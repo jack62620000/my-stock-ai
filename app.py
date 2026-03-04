@@ -76,22 +76,27 @@ def get_comprehensive_data(code):
 @st.cache_data(ttl=86400)
 def get_ai_analysis_report(d, code, api_key):
     try:
+        # 1. 初始化配置
         genai.configure(api_key=api_key.strip())
         
-        # --- 核心修正：嘗試三種最可能的名稱格式 ---
-        # 1. 最標準的正式版名稱
-        # 2. 加上 models/ 前綴的名稱
-        # 3. 備援的穩定版 (gemini-pro)
+        # 2. 核心修正：嘗試三種最可能的名稱格式 (由新到舊)
+        # 排除 models/ 前綴以避免系統重複拼接成 models/models/
+        model_names = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro']
+        model = None
         
-        try:
-            model = genai.GenerativeModel('gemini-1.5-flash')
-        except:
+        for name in model_names:
             try:
-                model = genai.GenerativeModel('models/gemini-1.5-flash')
+                model = genai.GenerativeModel(name)
+                # 測試一下是否真的能用，避免 404
+                # 我們不實際發送大量內容，只測建立物件
+                break 
             except:
-                model = genai.GenerativeModel('gemini-pro') 
+                continue
+        
+        if not model:
+            return "❌ 嘗試了多種模型路徑 (1.5-flash, 1.5-pro, gemini-pro) 均失敗，請檢查 API Key 權限或更新套件版本。"
 
-        # --- 以下 Prompt 邏輯保持不變 ---
+        # 3. 準備數據 (確保與 get_comprehensive_data 字典 Key 完全一致)
         lt = d['df'].iloc[-1]
         k_val = d['stoch'].iloc[-1, 0]
         d_val = d['stoch'].iloc[-1, 1]
@@ -119,10 +124,12 @@ def get_ai_analysis_report(d, code, api_key):
 5. 📈【終極投資策略建議】：
    給出具體的「長線持有」或「短線避險」建議。請提供長線及短線進場股價及停損點股價。"""
 
+        # 4. 執行生成
         response = model.generate_content(prompt)
         return response.text
 
     except Exception as e:
+        # 捕捉細節：如果還是報錯，讓你知道是哪邊斷掉
         return f"⚠️ AI 診斷目前無法連線：{str(e)}"
 
 # --- 4. UI 介面 ---
@@ -200,6 +207,7 @@ if code_input:
 
     else:
         st.error("❌ 抓不到數據，請確認代碼是否正確。")
+
 
 
 
