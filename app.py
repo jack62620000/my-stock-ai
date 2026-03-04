@@ -62,7 +62,7 @@ if code_input:
             else:
                 t3.warning("空頭整理")
 
-        # --- 第三部分：Gemini AI 診斷 (精準路徑版) ---
+        # --- 第三部分：Gemini AI 診斷 (自動偵測模型版) ---
         st.divider()
         st.subheader("🤖 Gemini AI 專家點評")
         
@@ -70,27 +70,30 @@ if code_input:
         
         if api_key:
             try:
-                # 1. 基礎配置
                 genai.configure(api_key=api_key.strip())
                 
-                # 2. 直接使用 models/ 前綴，這在某些地區是強制的
-                # 我們優先嘗試最新的 1.5 flash
-                try:
-                    model = genai.GenerativeModel('models/gemini-1.5-flash')
-                    prompt = f"你是台股分析師。請用 20 字分析台股 {d['name']}。"
-                    response = model.generate_content(prompt)
-                except:
-                    # 如果失敗，嘗試不帶 models/ 的版本
-                    model = genai.GenerativeModel('gemini-1.5-flash')
-                    response = model.generate_content(prompt)
+                # 1. 自動找尋妳帳號目前可用的模型
+                available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
                 
-                if response and response.text:
-                    st.info(response.text)
+                if available_models:
+                    # 優先找 flash，找不到就找 pro，再找不到就用第一個
+                    target_model = next((m for m in available_models if 'gemini-1.5-flash' in m), 
+                                      next((m for m in available_models if 'gemini-pro' in m), 
+                                      available_models[0]))
+                    
+                    model = genai.GenerativeModel(target_model)
+                    prompt = f"妳是台股專家，請分析{d['name']}({code_input})，目前價格{d['p']}元，請給出一句30字內的短線建議。"
+                    
+                    response = model.generate_content(prompt)
+                    
+                    if response and response.text:
+                        st.info(f"使用模型 ({target_model}):\n\n{response.text}")
+                    else:
+                        st.warning("AI 已連線但未回傳內容。")
                 else:
-                    st.warning("AI 已連線，但內容被過濾，請換個代碼試試。")
+                    st.error("❌ 妳的 API Key 目前沒有可用模型，請確認 Google AI Studio 權限。")
                     
             except Exception as error:
-                # 這裡會顯示最終的偵錯訊息
                 st.error(f"⚠️ 連線細節：{str(error)}")
         else:
             st.error("🔑 尚未在 Secrets 中設定 GEMINI_API_KEY")
