@@ -76,16 +76,17 @@ def get_comprehensive_data(code):
 @st.cache_data(ttl=86400)
 def get_ai_analysis_report(d, code, api_key):
     try:
+        # 1. 配置 API
         genai.configure(api_key=api_key.strip())
         
-        # --- 暴力修復：不再 list_models，直接指定 1.5-flash ---
-        # 這是最穩定的舊版路徑，通常跟 2.0 / 2.5 的額度是分開算的
-        model = genai.GenerativeModel('gemini-1.5-flash')
-
-        # 3. 準備 Prompt
+        # 2. 直接指定模型名稱（不加任何 models/ 或 v1beta/ 前綴）
+        # 這是最不容易噴 404 的寫法
+        model = genai.GenerativeModel('gemini-1.5-flash') 
+        
+        # 3. 準備 Prompt (確保數據名稱對齊)
         lt = d['df'].iloc[-1]
-        k_val = d['stoch'].iloc[-1, 0] # K值
-        d_val = d['stoch'].iloc[-1, 1] # D值
+        k_val = d['stoch'].iloc[-1, 0]
+        d_val = d['stoch'].iloc[-1, 1]
         
         prompt = f"""你現在是融合「巴菲特價值眼光」與「高盛首席策略分析師」的頂尖 AI 顧問。
 請針對股票：{d['name']} ({code}) 進行精確且多方面的專業分析報告。
@@ -93,9 +94,9 @@ def get_ai_analysis_report(d, code, api_key):
 【⚠️ 執行指令】：請直接從第 1 點開始輸出報告，嚴禁任何開場白、問候語或自我介紹。
 
 【當前關鍵數據】
-- 財務：現價 {round(d['p'], 1)}元, ROE {round(d['roe']*100, 2)}%, 毛利率 {round(d['gp']*100, 2)}%
+- 財務：現價 {round(d['p'], 1)}元, ROE {round(d['roe']*100, 2)}%, 毛利 {round(d['gp']*100, 2)}%
 - 技術：K值 {round(k_val, 1)}, D值 {round(d_val, 1)}, RSI {round(lt['RSI'], 1)}
-- 預估：內在合理價 {round(d['intrinsic'], 1)}元 (安全邊際 {round(d['safety']*100, 1)}%)
+- 預估：合理價 {round(d['intrinsic'], 1)}元 (安全邊際 {round(d['safety']*100, 1)}%)
 
 請嚴格依照以下結構輸出報告內容：
 
@@ -110,12 +111,12 @@ def get_ai_analysis_report(d, code, api_key):
 5. 📈【終極投資策略建議】：
    給出具體的「長線持有」或「短線避險」建議。請提供長線及短線進場股價及停損點股價。"""
 
-        # 4. 執行分析
+        # 4. 執行
         response = model.generate_content(prompt)
         return response.text
 
     except Exception as e:
-        # 如果 1.5-flash 也爆了，我們在這邊抓錯誤
+        # 如果還是 404，這裡會捕捉到
         return f"⚠️ 診斷發生錯誤：{str(e)}"
 
 # --- 4. UI 介面 ---
@@ -193,6 +194,7 @@ if code_input:
 
     else:
         st.error("❌ 抓不到數據，請確認代碼是否正確。")
+
 
 
 
