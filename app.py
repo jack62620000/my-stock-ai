@@ -51,7 +51,7 @@ def get_full_analysis_data(code):
     return None
 
 # 3. AI 分析函式
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=1800)
 def get_buffett_pro_analysis(d, code, api_key):
     try:
         genai.configure(api_key=api_key.strip())
@@ -117,4 +117,5 @@ if code_input:
             st.error("🔑 請設定 API Key")
     else:
         st.warning("❌ 抓不到數據，請確認代碼。")
+
 
