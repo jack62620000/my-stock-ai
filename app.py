@@ -76,26 +76,28 @@ def get_comprehensive_data(code):
 @st.cache_data(ttl=86400)
 def get_ai_analysis_report(d, code, api_key):
     try:
-        # 1. 初始化配置 (清理 API Key)
+        # 1. 初始化配置
         genai.configure(api_key=api_key.strip())
         
-        # 2. 依照 Stack Overflow 的建議，依序嘗試最新的穩定模型
-        # 不加 models/ 前綴，直接使用模型字串，讓 SDK 自己處理版本
-        candidate_models = ['gemini-1.5-flash', 'gemini-2.5-flash', 'gemini-pro']
+        # 2. ✅ 修正：使用正確的穩定模型名稱 (2026年可用)
+        candidate_models = ['gemini-2.0-flash-exp', 'gemini-1.5-pro', 'gemini-1.5-flash-001', 'gemini-pro']
         model = None
         
         for m_name in candidate_models:
             try:
                 model = genai.GenerativeModel(m_name)
-                # 測試建立是否成功，若不噴錯就用這個
+                st.success(f"✅ 使用模型: {m_name}")  # 除錯用
                 break
-            except:
+            except Exception as model_err:
+                st.warning(f"⚠️ 模型 {m_name} 不可用: {str(model_err)[:50]}...")
                 continue
         
         if not model:
-            return "❌ 嘗試了所有已知模型均失敗，請檢查 API Key 或更新 requirements.txt。"
+            # ✅ 最終備案：直接使用最新的 Flash 模型
+            model = genai.GenerativeModel('gemini-1.5-flash-latest')
+            st.info("🔄 使用最新 Flash 模型作為備案")
 
-        # 3. 準備數據 (確保與 get_comprehensive_data 字典 Key 完全一致)
+        # 3. 準備數據 (保持不變)
         lt = d['df'].iloc[-1]
         k_val = d['stoch'].iloc[-1, 0]
         d_val = d['stoch'].iloc[-1, 1]
@@ -123,12 +125,15 @@ def get_ai_analysis_report(d, code, api_key):
 5. 📈【終極投資策略建議】：
    給出具體的「長線持有」或「短線避險」建議。請提供長線及短線進場股價及停損點股價。"""
 
-        # 4. 執行生成
+        # 4. 執行生成 + 錯誤處理
         response = model.generate_content(prompt)
-        return response.text
-
+        if response.text:
+            return response.text
+        else:
+            return "⚠️ AI 回應為空，請稍後再試"
+            
     except Exception as e:
-        return f"⚠️ AI 診斷目前無法連線：{str(e)}"
+        return f"⚠️ AI 診斷錯誤：{str(e)[:100]}"
 
 # --- 4. UI 介面 ---
 code_input = st.sidebar.text_input("🔍 輸入台股代碼", placeholder="3131").strip()
@@ -205,6 +210,7 @@ if code_input:
 
     else:
         st.error("❌ 抓不到數據，請確認代碼是否正確。")
+
 
 
 
