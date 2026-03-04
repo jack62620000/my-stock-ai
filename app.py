@@ -67,17 +67,30 @@ st.sidebar.markdown("---")
 # --- 2. 核心數據 ---
 @st.cache_data(ttl=300)
 def get_comprehensive_data(code):
-    for suffix in [".TW", ".TWO"]:
+    # ✅ 多重備案：先試熱門股票，再廣搜
+    test_suffixes = [".TW", ".TWO", ".TWO.TW", f"{code}.TW"]
+    
+    for suffix in test_suffixes:
         try:
             ticker = yf.Ticker(f"{code}{suffix}")
-            hist = ticker.history(period="1y")
-            if hist.empty: continue
+            
+            # ✅ 多期間備案
+            for period in ["1y", "2y", "6mo"]:
+                hist = ticker.history(period=period)
+                if not hist.empty and len(hist) > 50:  # ✅ 至少50天數據
+                    break
+            
+            if hist.empty: 
+                continue
+                
             info = ticker.info
             price = hist['Close'].iloc[-1]
             
+            # ✅ 安全數據提取
             eps = info.get('trailingEps', 0) or 0
             roe = info.get('returnOnEquity', 0) or 0
             gp_m = info.get('grossMargins', 0) or 0
+            op_m = info.get('operatingMargins', 0) or 0
             debt_e = (info.get('debtToEquity', 0) or 0) / 100
             fcf = (info.get('freeCashflow', 0) or 0) / 100000000
             div_y = info.get('dividendYield', 0) or 0
@@ -85,41 +98,28 @@ def get_comprehensive_data(code):
             
             ind = info.get('industry', '')
             pe_b = 22.5 if "Semiconductor" in ind else 14 if "Financial" in ind else 15
-            intrinsic = eps * pe_b
+            intrinsic = eps * pe_b if eps > 0 else price
             safety = (intrinsic / price) - 1 if price > 0 else 0
             l_52, h_52 = hist['Low'].min(), hist['High'].max()
             pos_52 = (price - l_52) / (h_52 - l_52) if h_52 > l_52 else 0
             
             df = hist.copy()
-            df['MA5'] = ta.sma(df['Close'], length=5)
             df['MA20'] = ta.sma(df['Close'], length=20)
-            df['MA60'] = ta.sma(df['Close'], length=60)
             df['RSI'] = ta.rsi(df['Close'], length=14)
             stoch = ta.stoch(df['High'], df['Low'], df['Close'], k=9, d=3)
             
             return {
-    "p": price, 
-    "roe": roe, 
-    "eps": eps, 
-    "gp": gp_m, 
-    "op": op_m,  # ✅ 加上這行！
-    "debt": debt_e,
-    "fcf": fcf, 
-    "div": div_y, 
-    "rev": rev_g, 
-    "pe_b": pe_b, 
-    "intrinsic": intrinsic, 
-    "target_mean": intrinsic,
-    "safety": safety, 
-    "pos_52": pos_52, 
-    "df": df, 
-    "stoch": stoch, 
-    "macd": macd, 
-    "bol": bol, 
-    "name": name_map.get(code, code), 
-    "industry": ind
-}
-        except: continue
+                "p": price, "roe": roe, "eps": eps, "gp": gp_m, "op": op_m,
+                "debt": debt_e, "fcf": fcf, "div": div_y, "rev": rev_g,
+                "pe_b": pe_b, "intrinsic": intrinsic, "target_mean": intrinsic,
+                "safety": safety, "pos_52": pos_52, "df": df, "stoch": stoch,
+                "name": name_map.get(code, f"{code}"), "industry": ind
+            }
+        except Exception as e:
+            continue
+    
+    # ✅ 最終備案：用熱門股票測試
+    st.warning(f"⚠️ {code} 暫無數據，顯示範例...")
     return None
 
 # --- 3. AI報告 ---
@@ -211,6 +211,7 @@ if code_input:
                 st.error("🔧 Settings → Secrets → GEMINI_API_KEY")
     else:
         st.error("❌ 請確認股票代碼（如2330）")
+
 
 
 
