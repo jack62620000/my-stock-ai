@@ -5,8 +5,8 @@ import pandas_ta as ta
 import google.generativeai as genai
 
 # 1. 頁面設定
-st.set_page_config(page_title="巴菲特 AI 全方位戰情室", layout="wide")
-st.title("🧙‍♂️ 巴菲特 x 策略分析師：台股深度診斷系統")
+st.set_page_config(page_title="台股分析", layout="wide")
+st.title("台股分析")
 st.markdown("---")
 
 # 2. 強化數據抓取
@@ -131,8 +131,3 @@ if code_input:
             st.error("🔑 請設定 API Key")
     else:
         st.warning("❌ 抓不到數據，請確認代碼。")
-
-
-
-
-
