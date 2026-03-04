@@ -64,6 +64,8 @@ def get_buffett_pro_analysis(d, code, api_key):
         prompt = f"""
         你現在是融合「巴菲特價值眼光」與「高盛首席策略分析師」的頂尖 AI 顧問。
         請針對股票：{d['name']} ({code}) 進行精確且多方面的專業分析報告。
+        請直接從「1. 🌍【全球局勢與宏觀風險分析】」開始輸出報告內容。
+        嚴禁輸出任何開場白、問候語或自我介紹。
 
         【當前關鍵數據】
         - 財務：現價 {round(d['price'],1)}元, ROE {round(d['roe']*100,2)}%, 毛利 {round(d['margin']*100,2)}%
@@ -90,8 +92,9 @@ def get_buffett_pro_analysis(d, code, api_key):
            - 短線進場價：
            - 停損點建議：
         
-        語氣：犀利、專業、多面向。
-        """
+        【⚠️ 重要執行指令】：
+        1. 請直接從「1. 🌍【全球局勢與宏觀風險分析】」開始撰寫，不要有任何前言、開場白（例如：以下是針對...的報告）。
+        2. 內容要犀利、專業，直接進入重點。
         
         response = model.generate_content(prompt)
         return response.text, target_model
@@ -118,4 +121,5 @@ if code_input:
             st.error("🔑 請設定 API Key")
     else:
         st.warning("❌ 抓不到數據。")
+
 
