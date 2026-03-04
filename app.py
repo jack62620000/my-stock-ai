@@ -143,28 +143,28 @@ if code_input:
     if d:
         st.title(f"📊 {d['name']} ({code_input})")
         
-        # 第一部分：2列6欄 → 每格2數據（超精簡）
-st.header("📋 基本面與估值")
-with st.container(border=True):
-    # 第1列：6大核心指標
-    c1, c2, c3, c4, c5, c6 = st.columns(6)
-    c1.metric("現價/合理價", f"${round(d['p'], 1)}/{round(d['intrinsic'], 1)}")
-    c2.metric("安全邊際", f"{d['safety']*100:.1f}%")
-    c3.metric("52週位階", f"{d['pos_52']*100:.1f}%")
-    c4.metric("ROE/毛利率", f"{d['roe']*100:.1f}%/{d['gp']*100:.1f}%")
-    c5.metric("營業利益率", f"{d['op']*100:.1f}%")
-    c6.metric("本益比", f"{d['p']/d['eps']:.1f}x" if d['eps']>0 else "N/A")
-    
-    st.markdown(" ")
-    
-    # 第2列：6個財務安全指標
-    f1, f2, f3, f4, f5, f6 = st.columns(6)
-    f1.metric("負債比率", f"{d['debt']*100:.1f}%")
-    f2.metric("現金流", f"{d['fcf']:.1f}億")
-    f3.metric("營收成長", f"{d['rev']*100:.1f}%")
-    f4.metric("前4季EPS", f"{d['eps']:.1f}")
-    f5.metric("殖利率", f"{d['div']*100:.2f}%")
-    f6.metric("決策", "🟢買入" if d['safety']>0.1 else "🔴賣出" if d['safety']<-0.2 else "⏳觀望")
+        # 第一部分：2列6欄（正確縮排）
+        st.header("📋 基本面與估值")
+        with st.container(border=True):
+            # 第1列：6大核心指標
+            c1, c2, c3, c4, c5, c6 = st.columns(6)
+            c1.metric("現價/合理價", f"${round(d['p'], 1)}/{round(d['intrinsic'], 1)}")
+            c2.metric("安全邊際", f"{d['safety']*100:.1f}%")
+            c3.metric("52週位階", f"{d['pos_52']*100:.1f}%")
+            c4.metric("ROE/毛利率", f"{d['roe']*100:.1f}%/{d['gp']*100:.1f}%")
+            c5.metric("營業利益率", f"{d['op']*100:.1f}%")
+            c6.metric("本益比", f"{d['p']/d['eps']:.1f}x" if d['eps']>0 else "N/A")
+            
+            st.markdown(" ")  # ✅ 與columns同一層縮排
+            
+            # 第2列：6個財務安全指標
+            f1, f2, f3, f4, f5, f6 = st.columns(6)
+            f1.metric("負債比率", f"{d['debt']*100:.1f}%")
+            f2.metric("現金流", f"{d['fcf']:.1f}億")
+            f3.metric("營收成長", f"{d['rev']*100:.1f}%")
+            f4.metric("前4季EPS", f"{d['eps']:.1f}")
+            f5.metric("殖利率", f"{d['div']*100:.2f}%")
+            f6.metric("決策", "🟢買入" if d['safety']>0.1 else "🔴賣出" if d['safety']<-0.2 else "⏳觀望")
 
         # 第二部分：技術面分析（正確縮排）
         st.markdown(" ")
@@ -198,6 +198,7 @@ with st.container(border=True):
                 st.error("🔧 Settings → Secrets → GEMINI_API_KEY")
     else:
         st.error("❌ 請確認股票代碼（如2330）")
+
 
 
 
