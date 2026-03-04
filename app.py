@@ -32,37 +32,34 @@ def fetch_data(code):
             }
         except: continue
     return None
+
 # 4. 側邊欄輸入
 st.sidebar.header("⚙️ 控制面板")
 code_input = st.sidebar.text_input("🔍 輸入台股代碼", value="3131").strip()
 
+# 5. UI 介面與邏輯處理
 if code_input:
-    data = fetch_data(code_input）
-# 5. UI 介面
-st.sidebar.title("📈 控制面板")
-code_input = st.sidebar.text_input("輸入股票代碼", value="3131").strip()
-
-if code_input:
-    data = fetch_data(code_input)
+    data = fetch_data(code_input) # <--- 剛才這裡少了一個括號，現在補上了
     
-    if d:
-        st.title(f"📊 {d['name']} ({code_input}) 診斷報告")
+    if data: # <--- 變數名稱統一口徑，改用 data
+        st.title(f"📊 {data['name']} ({code_input}) 診斷報告")
         
         # --- 第一部分：數據指標 ---
-       st.header("📋 第一部分：基本面與估值")
+        st.header("📋 第一部分：基本面與估值")
         info = data['info']
-        eps = info.get('trailingEps', 0) or 1 # 避免除以0
-        intrinsic = eps * 22.5 # 假設基準PE為22.5
+        eps = info.get('trailingEps', 0) or 1 
+        intrinsic = eps * 22.5 
         safety = (intrinsic / data['p']) - 1
+        roe_val = info.get('returnOnEquity', 0)
         
         with st.container(border=True):
             m1, m2, m3, m4 = st.columns(4)
             m1.metric("目前股價", f"{round(data['p'], 1)} 元")
             m2.metric("合理價(估)", f"{round(intrinsic, 1)} 元")
             m3.metric("安全邊際", f"{round(safety*100, 1)}%")
-            m4.metric("ROE", f"{round(info.get('returnOnEquity', 0)*100, 2)}%")
+            m4.metric("ROE", f"{round(roe_val*100, 2)}%")
 
-        # --- 第二部分：技術走勢分析 (保證顯示) ---
+        # --- 第二部分：技術走勢分析 ---
         st.header("📉 第二部分：技術走勢分析")
         df = data['df'].copy()
         df['MA20'] = ta.sma(df['Close'], length=20)
@@ -84,8 +81,12 @@ if code_input:
                 st.write(f"52週最低: {df['Low'].min()}")
             with t4:
                 st.write("**【 建議策略 】**")
-                st.success("持股續抱" if data['p'] > latest['MA20'] else "觀望為宜")
-       # --- 第三部分：Gemini AI 專家點評 (自動偵測模型版) ---
+                if data['p'] > latest['MA20']:
+                    st.success("持股續抱")
+                else:
+                    st.warning("觀望為宜")
+
+        # --- 第三部分：Gemini AI 專家點評 ---
         st.divider()
         st.subheader("🤖 Gemini AI 專家點評")
         
@@ -94,16 +95,14 @@ if code_input:
         if api_key:
             try:
                 genai.configure(api_key=api_key.strip())
-                
-                # 自動找尋可用的模型名稱 (避免 404)
                 available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
                 
                 if available_models:
-                    # 優先挑選 flash，沒有就挑第一個
                     target_model = next((m for m in available_models if '1.5-flash' in m), available_models[0])
                     model = genai.GenerativeModel(target_model)
                     
-                    prompt = f"妳是台股專家，請針對 {d['name']}({code_input}) 分析：價格 {d['p']}，ROE {round(d['roe']*100,1)}%。請給出 30 字內的投資建議。"
+                    # 修正 Prompt 中的變數名稱
+                    prompt = f"妳是台股專家，請針對 {data['name']}({code_input}) 分析：價格 {data['p']}，ROE {round(roe_val*100,1)}%。請給出 30 字內的投資建議。"
                     response = model.generate_content(prompt)
                     
                     if response and response.text:
@@ -111,7 +110,7 @@ if code_input:
                     else:
                         st.warning("AI 已連線但未回傳內容。")
                 else:
-                    st.error("❌ 找不到可用模型，請確認 API Key 權限。")
+                    st.error("❌ 找不到可用模型。")
                     
             except Exception as error:
                 st.error(f"⚠️ 連線細節：{str(error)}")
@@ -120,6 +119,3 @@ if code_input:
             
     else:
         st.error("❌ 無法抓取數據，請確認代碼是否正確。")
-
-
-
