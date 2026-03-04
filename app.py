@@ -64,32 +64,35 @@ if code_input:
             else:
                 t3.warning("空頭整理")
 
-        # --- 找到第三部分 AI 區塊，直接替換為這段 ---
+        # --- 找到第三部分 AI 區塊，用這段替換 ---
         st.divider()
         st.subheader("🤖 Gemini AI 專家點評")
         
         api_key = st.secrets.get("GEMINI_API_KEY")
         if api_key:
             try:
-                # 1. 配置 Key
                 genai.configure(api_key=api_key)
                 
-                # 2. 強制指定模型 (請確保完全手打，不要複製奇怪的格式)
-                model = genai.GenerativeModel('gemini-1.5-flash')
+                # 備選模型名單，增加成功率
+                model_names = ['gemini-1.5-flash-latest', 'gemini-1.5-flash', 'gemini-pro']
                 
-                # 3. 簡化 Prompt 測試
-                prompt = f"請針對台股 {code_input} 提供一句 30 字內的投資策略建議。"
-                
-                # 4. 取得回應
-                response = model.generate_content(prompt)
+                response = None
+                for name in model_names:
+                    try:
+                        model = genai.GenerativeModel(name)
+                        prompt = f"請分析台股{code_input}，價格{d['p']}，給出一句30字內策略。"
+                        response = model.generate_content(prompt)
+                        if response: break # 只要成功抓到一個就跳出循環
+                    except:
+                        continue
                 
                 if response and response.text:
                     st.info(response.text)
                 else:
-                    st.warning("AI 目前沒有回傳建議，請稍後再試。")
+                    st.warning("AI 目前無法生成文字，請稍後再試。")
                     
             except Exception as e:
-                # 如果還是失敗，顯示最精簡的錯誤訊息
-                st.error(f"連線成功但呼叫失敗：{str(e)}")
+                # 顯示縮短後的錯誤，方便除錯
+                st.error(f"連線成功但型號不符：{str(e)[:50]}...")
         else:
             st.error("🔑 請在 Secrets 中設定 GEMINI_API_KEY")
