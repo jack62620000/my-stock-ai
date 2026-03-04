@@ -1,220 +1,135 @@
+import streamlit as st
 import yfinance as yf
-import gspread
-import time
 import pandas as pd
-from google.colab import auth
-from google.auth import default
+import pandas_ta as ta
+import google.generativeai as genai
 
-# 1. 認證與連接
-auth.authenticate_user()
-creds, _ = default()
-gc = gspread.authorize(creds)
+# 1. 頁面設定
+st.set_page_config(page_title="台股分析", layout="wide")
+st.title("台股分析")
+st.markdown("---")
 
-# 開啟試算表
-sh = gc.open("Buffett_Stock_Valuation_Table")
-ws_main = sh.worksheet("台股分析")
-ws_trend = sh.worksheet("股價走勢分析")
-ws_db = sh.worksheet("代碼對照表")
+# 2. 強化數據抓取
+def get_full_analysis_data(code):
+    for suffix in [".TWO", ".TW"]:
+        try:
+            t = yf.Ticker(f"{code}{suffix}")
+            df = t.history(period="1y")
+            if df.empty: continue
+            
+            info = t.info
+            # --- 技術指標計算 ---
+            # KD 指標 (預設 14, 3, 3)
+            kd = ta.stoch(df['High'], df['Low'], df['Close'])
+            # MACD
+            macd = ta.macd(df['Close'])
+            # RSI & 均線
+            df['RSI'] = ta.rsi(df['Close'], length=14)
+            df['MA20'] = ta.sma(df['Close'], length=20)
+            df['MA60'] = ta.sma(df['Close'], length=60)
+            
+            # 合併所有指標到 df
+            df = pd.concat([df, kd, macd], axis=1)
+            
+            # 模擬大戶法人動向
+            vol_ma = df['Volume'].rolling(window=5).mean()
+            institutional_proxy = "增加" if df['Volume'].iloc[-1] > vol_ma.iloc[-1] and df['Close'].iloc[-1] > df['Open'].iloc[-1] else "持平或減少"
 
-def get_sector_pe(official_ind):
-    ind_str = str(official_ind)
-    if any(k in ind_str for k in ["半導體", "IC設計"]): return "科技權值", 25
-    if any(k in ind_str for k in ["電腦", "電子", "通訊", "伺服器", "散熱"]): return "AI硬體", 20
-    if "金融" in ind_str: return "金融產業", 14
-    if any(k in ind_str for k in ["鋼鐵", "塑膠", "水泥", "航運"]): return "週期傳產", 10
-    return "一般類股", 15
+            return {
+                "name": info.get('shortName') or f"股票 {code}",
+                "sector": info.get('sector', '未知'),
+                "price": df['Close'].iloc[-1],
+                "roe": info.get('returnOnEquity', 0),
+                "margin": info.get('grossMargins', 0),
+                "debt": info.get('debtToEquity', 0),
+                "target_mean": info.get('targetMeanPrice'),
+                "inst_proxy": institutional_proxy,
+                "latest_tech": df.iloc[-1], 
+                "df": df.tail(60)
+            }
+        except: continue
+    return None
 
-# --- 基礎資料準備 ---
-db_data = ws_db.get_all_values()
-stock_db = {str(row[0]).strip(): (row[1], row[2]) for row in db_data[1:] if len(row) >= 3}
-
-# ==========================================
-# 階段 1：【台股分析】(T 欄全方位洞察升級版)
-# ==========================================
-main_codes = ws_main.col_values(1)[4:] 
-print("🚀 啟動階段 1/2：台股分析 (基本面 + 深度洞察)...")
-
-for i, code in enumerate(main_codes):
-    row_idx = i + 5 
-    code = str(code).strip()
-    if not code: continue
-    
-    db_name, official_ind = stock_db.get(code, (None, "一般類股"))
+# 3. AI 分析函式
+@st.cache_data(ttl=1800)
+def get_buffett_pro_analysis(d, code, api_key):
     try:
-        stock = yf.Ticker(f"{code}.TW")
-        info = stock.info
-        if not info.get('currentPrice'): 
-            stock = yf.Ticker(f"{code}.TWO")
-            info = stock.info
+        genai.configure(api_key=api_key.strip())
         
-        # --- 數據採集 ---
-        price = info.get('currentPrice', 0)
-        roe = info.get('returnOnEquity', 0) or 0
-        debt_ratio = (info.get('debtToEquity', 0) or 0) / 100
-        fcf_raw = info.get('freeCashflow', 0) or 0
-        qr_raw = info.get('quickRatio') or 0
-        cr_raw = info.get('currentRatio') or 0
-        eps = info.get('trailingEps', 0)
-        rev_growth = info.get('revenueGrowth', 0) or 0
-        div_yield = info.get('dividendYield', 0) or 0
+        # 取得所有可用模型
+        model_list = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
         
-        # PE 與 52週位階
-        raw_market_pe = info.get('trailingPE')
-        sector_type, pe_bench = get_sector_pe(official_ind)
-        market_pe_display = round(raw_market_pe, 2) if (raw_market_pe and raw_market_pe < 500) else "過高(失真)"
+        # 1. 調整優先順序：避開目前報錯的 2.0-flash，優先找 1.5-flash
+        # 因為 1.5 的免費額度通常比較穩，不會隨便歸零
+        target_model = None
+        for preferred in ['models/gemini-1.5-flash', 'models/gemini-1.5-pro']:
+            if preferred in model_list:
+                target_model = preferred
+                break
         
-        intrinsic = round(eps * pe_bench, 2)
-        safety_val = (intrinsic / price) - 1 if price > 0 else 0
-        pos_52 = (price - info.get('fiftyTwoWeekLow', 0)) / (info.get('fiftyTwoWeekHigh', 1) - info.get('fiftyTwoWeekLow', 0)) if info.get('fiftyTwoWeekHigh', 0) > 0 else 0.5
+        # 如果找不到 1.5 系列，才隨便抓一個（除了 2.0 以外的）
+        if not target_model:
+            target_model = next((m for m in model_list if '2.0' not in m), model_list[0])
+            
+        model = genai.GenerativeModel(target_model)
+        
+        lt = d['latest_tech']
+        
+        # 確保抓得到 KD 欄位，若名稱不符則預設為 0
+        k_val = lt.get('STOCHk_14_3_3', 0)
+        d_val = lt.get('STOCHd_14_3_3', 0)
+        
+        prompt = f"""你現在是融合「巴菲特價值眼光」與「高盛首席策略分析師」的頂尖 AI 顧問。
+請針對股票：{d['name']} ({code}) 進行精確且多方面的專業分析報告。
 
-        # --- S 欄：五星評等邏輯 ---
-        if roe > 0.18 and pos_52 < 0.35 and fcf_raw > 0: rating = "🌟 積極布局"
-        elif safety_val > 0.1: rating = "🟢 分批買進"
-        elif roe > 0.12 and pos_52 < 0.6: rating = "🟡 持有觀望"
-        elif pos_52 > 0.8 or roe < 0.08: rating = "🟠 縮減倉位"
-        else: rating = "🚫 暫不考慮"
+【⚠️ 執行指令】：請直接從第 1 點開始輸出報告，嚴禁任何開場白、問候語或自我介紹。
 
-        # --- 🏆 核心升級：T 欄全方位決策洞察 (多因子聯動) ---
-        is_excellent = (roe > 0.18 and fcf_raw > 0 and debt_ratio < 0.5)
-        is_cheap = (safety_val > 0.15)
-        is_expensive = (safety_val < -0.15)
-        is_low_pos = (pos_52 < 0.35)
-        
-        if is_excellent and is_cheap:
-            insight = f"💎【極致價值】體質卓越且定價低估(空間{round(safety_val*100)}%)。此標的具複利成長基因，低位階提供極高安全邊際，為核心首選。"
-        elif is_excellent and is_expensive:
-            insight = f"📈【優質溢價】績優標的但目前預期透支。雖然ROE亮眼，但高溢價抵銷回報，建議「持股續抱、不加新倉」，靜待回檔合理區。"
-        elif not is_excellent and is_cheap and is_low_pos:
-            insight = f"🩹【低位修復】體質平庸但股價超跌，具{round(safety_val*100)}%估值修復空間。適合以技術面介入賺取短線反彈，不宜長期重倉。"
-        elif fcf_raw <= 0 and is_expensive:
-            insight = "🚨【高度警戒】盈餘品質差(現金流負)且股價嚴重過熱。屬題材投機階段，隨時有崩盤回補缺口風險，應逢高減碼、入袋為安。"
-        elif div_yield > 0.05 and debt_ratio < 0.4:
-            insight = f"💰【防禦收息】高殖利率({round(div_yield*100,1)}%)搭配健康財務，屬波動時期避風港。定價合理，適合長期穩健存股配置。"
-        elif rev_growth > 0.2 and roe > 0.12:
-            insight = "🚀【成長動能】營收爆發帶動獲利擴張。雖估值不便宜，但動能強勁。應聚焦後續成長延續性，並依技術面找尋攻擊買點。"
+【當前關鍵數據】
+- 財務：現價 {round(d['price'],1)}元, ROE {round(d['roe']*100,2)}%, 毛利 {round(d['margin']*100,2)}%
+- 技術：K值 {round(k_val,1)}, D值 {round(d_val,1)}, RSI {round(lt['RSI'],1)}
+- 籌碼：近期法人/大戶買賣力道參考為「{d['inst_proxy']}」
+
+請嚴格依照以下結構輸出報告內容：
+
+1. 🌍【全球局勢與宏觀風險分析】：
+   分析2026年全球政經局勢（如美國關稅政策、供應鏈碎片化、通膨壓力等）對 {d['name']} 的具體影響，這家公司是否具備對抗全球波動的韌性？
+
+2. 💎【巴菲特的內在價值審查】：
+   從毛利與財務穩健度看，是否有寬廣護城河？護城河有哪些？全球市佔率預估是多少？在目前通膨環境下是否具備「定價權」？
+
+3. 📉【股價走勢與動能判斷】：
+   目前的 K線、KD、MACD、RSI 透露什麼買賣訊號？目前股價是反應基本面價值，還是處於市場情緒的過度波動？分析大戶及法人買賣趨勢。
+
+4. 🎯【法人目標價與達成時間預估】：
+   分析法人平均目標價 {d['target_mean'] if d['target_mean'] else 'N/A'} 的合理性。預估股價達到合理價的預測時間，並說明預測理由。
+
+5. 📈【終極投資策略建議】：
+   給出具體的「長線持有」或「短線避險」建議。請提供長線及短線進場股價及停損點股價。"""
+
+        response = model.generate_content(prompt)
+        return response.text, target_model
+    except Exception as e:
+        return str(e), None
+
+# 4. UI 介面
+code_input = st.sidebar.text_input("🔍 輸入台股代碼", value="2330").strip()
+st.sidebar.button("🧹 清除快取", on_click=lambda: st.cache_data.clear())
+
+if code_input:
+    data = get_full_analysis_data(code_input)
+    if data:
+        api_key = st.secrets.get("GEMINI_API_KEY")
+        if api_key:
+            with st.spinner(f'AI 正在分析 {data["name"]}...'):
+                ans, m_name = get_buffett_pro_analysis(data, code_input, api_key)
+                if m_name:
+                    st.markdown(f"### 🛡️ AI分析報告：{data['name']} ({code_input})")
+                    st.write(ans)
+                else:
+                    st.error(f"⚠️ 錯誤：{ans}")
         else:
-            insight = "⏳【中性觀望】各項財務與估值數據皆處於中庸地帶，市場缺乏明顯驅動力量。建議保留現金彈性，等待下一季財報變數釐清。"
+            st.error("🔑 請設定 API Key")
+    else:
+        st.warning("❌ 抓不到數據，請確認代碼。")
 
-        # --- 數據裝箱 (B 到 T 欄) ---
-        row_data = [[
-            db_name if db_name else info.get('shortName', '未知'), # B
-            price, # C
-            f"{round(roe*100, 2)}%", # D
-            f"{round(info.get('grossMargins', 0)*100, 2)}%", # E
-            f"{round(info.get('operatingMargins', 0)*100, 2)}%", # F
-            f"{round(debt_ratio*100, 2)}%", # G
-            market_pe_display, # H
-            pe_bench, # I
-            f"{round(pos_52 * 100, 1)}%", # J
-            eps, # K
-            intrinsic, # L
-            f"{round(fcf_raw / 100000000, 2)} 億", # M
-            f"{round(qr_raw * 100, 2)}%" if qr_raw else "－", # N
-            f"{round(cr_raw * 100, 2)}%" if cr_raw else "－", # O
-            f"{round(info.get('dividendYield', 0)*100, 2)}%", # P
-            f"{round(rev_growth*100, 2)}%", # Q
-            f"{round(safety_val * 100, 2)}%", # R
-            rating, # S
-            insight # T: 合併後的深度洞察
-        ]]
-        
-        ws_main.update(range_name=f"B{row_idx}:T{row_idx}", values=row_data, value_input_option='USER_ENTERED')
-        print(f"✅ 台股分析: {code} 深度洞察更新完成")
-        
-    except Exception as e:
-        print(f"❌ 台股分析: {code} 錯誤: {e}")
-    time.sleep(1.2)
 
-# ==========================================
-# 階段 2：【股價走勢分析】(新增技術、籌碼、振幅)
-# ==========================================
-trend_codes = ws_trend.col_values(1)[4:] 
-print("\n📈 啟動階段 2/2：股價走勢分析 (技術/籌碼)...")
-
-for i, code in enumerate(trend_codes):
-    row_idx = i + 5
-    code = str(code).strip()
-    if not code: continue
-    
-    try:
-        stock = yf.Ticker(f"{code}.TW")
-        df = stock.history(period="120d")
-        if df.empty:
-            stock = yf.Ticker(f"{code}.TWO")
-            df = stock.history(period="120d")
-        
-        info = stock.info
-        cur_p = df['Close'].iloc[-1]
-        
-        # 1. 均線與乖離 (G 欄)
-        ma5 = df['Close'].rolling(5).mean().iloc[-1]
-        ma20 = df['Close'].rolling(20).mean().iloc[-1]
-        ma60 = df['Close'].rolling(60).mean().iloc[-1]
-        bias = (cur_p - ma20) / ma20
-
-        # 2. 量能與均量變化 (O, P, Q 欄)
-        vol_today = df['Volume'].iloc[-1] / 1000
-        avg_vol_5 = df['Volume'].rolling(5).mean().iloc[-1] / 1000
-        prev_avg_vol_5 = df['Volume'].rolling(5).mean().iloc[-2] / 1000
-        vol_change = avg_vol_5 - prev_avg_vol_5 # 五日均張變化
-        vol_ratio = vol_today / avg_vol_5 if avg_vol_5 > 0 else 1 # 量能噴發比
-
-        # 3. 股價振幅 (R 欄)
-        amp = (df['High'].iloc[-1] - df['Low'].iloc[-1]) / df['Close'].iloc[-2]
-
-        # 4. 技術指標 (RSI, KD, MACD)
-        delta = df['Close'].diff()
-        gain = (delta.where(delta > 0, 0)).rolling(14).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
-        rsi_val = 100 - (100 / (1 + (gain / loss).iloc[-1]))
-        
-        low_9, high_9 = df['Low'].rolling(9).min(), df['High'].rolling(9).max()
-        rsv = (df['Close'] - low_9) / (high_9 - low_9) * 100
-        k_val = rsv.ewm(com=2).mean().iloc[-1]
-        d_val = pd.Series(rsv.ewm(com=2).mean()).ewm(com=2).mean().iloc[-1]
-        
-        ema12 = df['Close'].ewm(span=12, adjust=False).mean()
-        ema26 = df['Close'].ewm(span=26, adjust=False).mean()
-        macd_hist = (ema12 - ema26 - (ema12 - ema26).ewm(span=9, adjust=False).mean()).iloc[-1]
-
-        # 5. 布林通道 (S, T 欄)
-        std20 = df['Close'].rolling(20).std().iloc[-1]
-        up_b, lo_b = ma20 + (std20 * 2), ma20 - (std20 * 2)
-
-        # 6. 診斷與策略
-        diag = []
-        if vol_ratio > 2: diag.append("量能爆發")
-        if amp > 0.05: diag.append("震幅放大")
-        if k_val > d_val and rsv.iloc[-2] <= k_val: diag.append("KD金叉")
-        
-        strategy = "✅ 趨勢偏多，持股續抱" if cur_p > ma20 else "⏳ 盤整觀察"
-        if vol_ratio > 1.8 and k_val < 50 and k_val > d_val: strategy = "🚀 轉強訊號，分批試單"
-
-        # --- 數據裝箱 (B 到 W 欄) ---
-        trend_row = [[
-            stock_db.get(code, (None, ""))[0], # B
-            round(cur_p, 2), # C
-            round(ma5, 2), round(ma20, 2), round(ma60, 2), # D, E, F
-            round(bias, 4), # G (顯示百分比)
-            int(vol_today), # H
-            "放量" if vol_ratio > 1.2 else "縮量", # I
-            round(rsi_val, 2), # J
-            round(k_val, 2), round(d_val, 2), # K, L
-            round(macd_hist, 2), # M
-            round(info.get('heldPercentInstitutions', 0), 4), # N: 機構持股
-            round(vol_change, 1), # O: 均量變化 (純數字)
-            int(avg_vol_5), # P: 5日均量
-            round(vol_ratio, 2), # Q: 噴發比
-            round(amp, 4), # R: 振幅
-            round(up_b, 2), round(lo_b, 2), # S, T
-            "🌕強勢" if cur_p > ma20 else "🌑弱勢", # U
-            "；".join(diag) if diag else "趨勢運行中", # V
-            strategy # W
-        ]]
-        ws_trend.update(range_name=f"B{row_idx}:W{row_idx}", values=trend_row, value_input_option='USER_ENTERED')
-        print(f"✅ 走勢分析: {code} 更新成功")
-    except Exception as e:
-        print(f"❌ 走勢分析: {code} 錯誤: {e}")
-    time.sleep(1)
-
-print("\n🎉 所有工作表更新完畢！")
