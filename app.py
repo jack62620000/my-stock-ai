@@ -79,8 +79,10 @@ def get_ai_analysis_report(d, code, api_key):
         # --- 核心修復：自動偵測妳的 Key 擁有的模型路徑 ---
         available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
         
-        # 優先尋找包含 '1.5-flash' 的模型名 (可能是 models/gemini-1.5-flash 或 gemini-1.5-flash-latest)
-        target_model = next((m for m in available_models if '1.5-flash' in m), None)
+        # 改成更精準的排除法，避開 2.5：
+target_model = next((m for m in available_models if '1.5-flash' in m and '2.5' not in m), None)
+if not target_model:
+    target_model = next((m for m in available_models if '1.5-pro' in m), available_models[0])
         
         # 如果找不到 1.5-flash，就抓清單中第一個可用的 (通常是 1.0 或 1.5-pro)
         if not target_model:
@@ -188,3 +190,4 @@ if code_input:
 
     else:
         st.error("❌ 抓不到數據，請確認代碼是否正確。")
+
