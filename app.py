@@ -73,35 +73,15 @@ def get_comprehensive_data(code):
     return None
 
 # --- 3. AI 診斷報告函式 ---
-@st.cache_data(ttl=86400) # 設定 24 小時快取，省點額度
+@st.cache_data(ttl=86400)
 def get_ai_analysis_report(d, code, api_key):
     try:
-        # 1. 配置 API
         genai.configure(api_key=api_key.strip())
         
-        # --- 核心修正：強制排除所有帶有 2.5 字樣的模型 ---
-        available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        
-        # 2. 優先找 1.5-flash (且絕對不包含 2.5)
-        target_model = next((m for m in available_models if '1.5-flash' in m and '2.5' not in m), None)
-        
-        # 3. 如果沒了，找 1.5-pro (pro 的額度通常是獨立的 50 次/日)
-        if not target_model:
-            target_model = next((m for m in available_models if '1.5-pro' in m), None)
-            
-        # 4. 萬不得已，才抓清單第一個 (跳過 2.5)
-        if not target_model:
-             target_model = next((m for m in available_models if '2.5' not in m), available_models[0])
-        
-        # 如果還是找不到，才隨便抓一個，或是報錯
-        if not target_model:
-            if available_models:
-                target_model = available_models[0]
-            else:
-                return "❌ 找不到任何可用模型，請檢查 API Key 權限。"
-            
-        model = genai.GenerativeModel(target_model)
-        
+        # --- 暴力修復：不再 list_models，直接指定 1.5-flash ---
+        # 這是最穩定的舊版路徑，通常跟 2.0 / 2.5 的額度是分開算的
+        model = genai.GenerativeModel('gemini-1.5-flash')
+
         # 3. 準備 Prompt
         lt = d['df'].iloc[-1]
         k_val = d['stoch'].iloc[-1, 0] # K值
@@ -135,7 +115,7 @@ def get_ai_analysis_report(d, code, api_key):
         return response.text
 
     except Exception as e:
-        # 這裡就是妳剛才漏掉的 except 區塊
+        # 如果 1.5-flash 也爆了，我們在這邊抓錯誤
         return f"⚠️ 診斷發生錯誤：{str(e)}"
 
 # --- 4. UI 介面 ---
@@ -213,6 +193,7 @@ if code_input:
 
     else:
         st.error("❌ 抓不到數據，請確認代碼是否正確。")
+
 
 
 
