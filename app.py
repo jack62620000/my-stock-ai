@@ -56,18 +56,21 @@ def get_buffett_pro_analysis(d, code, api_key):
     try:
         genai.configure(api_key=api_key.strip())
         
-        # 1. 關鍵修復：從 Google 伺服器直接拉取「妳現在能用」的所有模型清單
+        # 取得所有可用模型
         model_list = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
         
-        # 2. 優先順序：1.5-flash > 1.5-pro > 2.0-flash > 1.0-pro (或者清單中的第一個)
-        if not model_list:
-            return "❌ 妳的 API Key 權限不足，找不到任何可用模型。", None
-            
-        target_model = next((m for m in model_list if '1.5-flash' in m), 
-                          next((m for m in model_list if '1.5-pro' in m), 
-                          next((m for m in model_list if '2.0-flash' in m), 
-                          model_list[0])))
+        # 1. 調整優先順序：避開目前報錯的 2.0-flash，優先找 1.5-flash
+        # 因為 1.5 的免費額度通常比較穩，不會隨便歸零
+        target_model = None
+        for preferred in ['models/gemini-1.5-flash', 'models/gemini-1.5-pro']:
+            if preferred in model_list:
+                target_model = preferred
+                break
         
+        # 如果找不到 1.5 系列，才隨便抓一個（除了 2.0 以外的）
+        if not target_model:
+            target_model = next((m for m in model_list if '2.0' not in m), model_list[0])
+            
         model = genai.GenerativeModel(target_model)
         
         lt = d['latest_tech']
@@ -128,6 +131,7 @@ if code_input:
             st.error("🔑 請設定 API Key")
     else:
         st.warning("❌ 抓不到數據，請確認代碼。")
+
 
 
 
