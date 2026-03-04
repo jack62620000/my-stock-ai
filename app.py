@@ -1,38 +1,51 @@
 import streamlit as st
 import yfinance as yf
 import google.generativeai as genai
+import time
 
-# 1. 頁面標題與樣式
-st.set_page_config(page_title="台股 AI 專家點評", layout="centered")
-st.title("🤖 台股 AI 智慧分析")
-st.caption("輸入代碼，立即獲取 Gemini AI 的投資點評")
+# 1. 頁面標題
+st.set_page_config(page_title="台股 AI 智慧分析", layout="centered")
+st.title("🤖 台股 AI 專家診斷")
 
-# 2. 側邊欄與輸入
-code = st.text_input("🔍 請輸入台股代碼 (例如: 2330, 3131)", value="2330").strip()
+# 2. 輸入框
+code = st.text_input("🔍 請輸入台股代碼", value="3131").strip()
 
-# 3. 數據抓取函式 (僅抓取關鍵數值供 AI 參考)
-def get_ai_data(code):
-    for suffix in [".TW", ".TWO"]:
+# 3. 穩定抓取函式
+def get_clean_data(code):
+    # 嘗試不同的後綴，並加入小延遲避免被封鎖
+    for suffix in [".TWO", ".TW"]:
         try:
-            ticker = yf.Ticker(f"{code}{suffix}")
-            df = ticker.history(period="1mo")
-            if df.empty: continue
+            t = yf.Ticker(f"{code}{suffix}")
+            # 抓取歷史股價
+            hist = t.history(period="1mo")
+            if hist.empty: continue
             
-            info = ticker.info
+            # 抓取基本面 (info 有時會失敗，所以用 try 包起來)
+            try:
+                info = t.info
+                name = info.get('shortName') or info.get('longName') or f"股票 {code}"
+                roe = info.get('returnOnEquity', 0)
+                eps = info.get('trailingEps', 0)
+            except:
+                name = f"股票 {code}"
+                roe = 0
+                eps = 0
+                
             return {
-                "name": info.get('shortName') or info.get('longName') or f"台股 {code}",
-                "price": df['Close'].iloc[-1],
-                "roe": info.get('returnOnEquity', 0),
-                "pe": info.get('trailingPE', 0),
-                "rev_growth": info.get('revenueGrowth', 0)
+                "name": name,
+                "price": hist['Close'].iloc[-1],
+                "roe": roe,
+                "eps": eps
             }
-        except: continue
+        except:
+            time.sleep(0.5)
+            continue
     return None
 
-# 4. 執行 AI 分析
+# 4. 執行與顯示
 if code:
-    with st.spinner('AI 正在讀取數據並撰寫報告...'):
-        data = get_ai_data(code)
+    with st.spinner('AI 分析中...'):
+        data = get_clean_data(code)
         
         if data:
             api_key = st.secrets.get("GEMINI_API_KEY")
@@ -41,30 +54,21 @@ if code:
                     genai.configure(api_key=api_key.strip())
                     model = genai.GenerativeModel('gemini-1.5-flash')
                     
-                    # 餵給 AI 的背景資料 (使用者看不到，只有 AI 看得到)
-                    prompt = f"""
-                    你是專業台股分析師。請針對以下數據進行點評：
-                    股票：{data['name']}({code})
-                    現價：{round(data['price'], 1)}
-                    ROE：{round(data['roe']*100, 2)}%
-                    本益比：{round(data['pe'], 2)}
-                    營收成長：{round(data['rev_growth']*100, 2)}%
-                    
-                    請用 50 字內，針對這檔股票給出毒辣且精準的短線與長線操作建議。
-                    """
+                    # 這是餵給 AI 的秘密指令
+                    prompt = f"你是頂尖台股分析師。分析{data['name']}({code})，現價{data['price']}元，ROE為{round(data['roe']*100,2)}%。請給出一段40字內的投資診斷建議。"
                     
                     response = model.generate_content(prompt)
                     
-                    # 5. 僅顯示 AI 點評結果
-                    st.chat_message("assistant").write(f"### 📋 {data['name']} ({code}) 診斷結果")
+                    # 僅顯示結果
+                    st.success(f"### 📋 {data['name']} ({code}) 診斷結果")
                     st.info(response.text)
                     
-                except Exception as e:
-                    st.error("⚠️ AI 暫時無法連線，請稍後再試。")
+                except:
+                    st.error("⚠️ AI 暫時忙碌中，請稍後再試。")
             else:
-                st.error("🔑 尚未設定 API Key")
+                st.error("🔑 請先在 Streamlit Cloud 設定 GEMINI_API_KEY")
         else:
-            st.error("❌ 找不到該股票數據，請確認代碼是否正確。")
+            st.warning(f"❌ 暫時抓不到 {code} 的數據。Yahoo 伺服器忙碌中，請點擊網頁右上角 'Rerun' 重試一次。")
 
 st.divider()
-st.caption("註：本分析由 AI 自動生成，僅供參考，不代表投資建議。")
+st.caption("註：本建議由 AI 生成，投資請謹慎評估。")
