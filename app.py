@@ -97,8 +97,9 @@ def get_ai_analysis_report(d, code, api_key):
         model = genai.GenerativeModel(target_model)
         
         # 3. 準備 Prompt
-        latest = d['df'].iloc[-1]
-        k, dv = d['stoch'].iloc[-1, 0], d['stoch'].iloc[-1, 1]
+        lt = d['df'].iloc[-1]
+        k_val = d['stoch'].iloc[-1, 0] # K值
+        d_val = d['stoch'].iloc[-1, 1] # D值
         
         prompt = f"""你現在是融合「巴菲特價值眼光」與「高盛首席策略分析師」的頂尖 AI 顧問。
 請針對股票：{d['name']} ({code}) 進行精確且多方面的專業分析報告。
@@ -106,9 +107,9 @@ def get_ai_analysis_report(d, code, api_key):
 【⚠️ 執行指令】：請直接從第 1 點開始輸出報告，嚴禁任何開場白、問候語或自我介紹。
 
 【當前關鍵數據】
-- 財務：現價 {round(d['price'],1)}元, ROE {round(d['roe']*100,2)}%, 毛利 {round(d['margin']*100,2)}%
-- 技術：K值 {round(k_val,1)}, D值 {round(d_val,1)}, RSI {round(lt['RSI'],1)}
-- 籌碼：近期法人/大戶買賣力道參考為「{d['inst_proxy']}」
+- 財務：現價 {round(d['p'], 1)}元, ROE {round(d['roe']*100, 2)}%, 毛利 {round(d['gp']*100, 2)}%
+- 技術：K值 {round(k_val, 1)}, D值 {round(d_val, 1)}, RSI {round(lt['RSI'], 1)}
+- 狀態：52週位階 {round(d['pos_52']*100, 1)}%
 
 請嚴格依照以下結構輸出報告內容：
 
@@ -206,5 +207,6 @@ if code_input:
 
     else:
         st.error("❌ 抓不到數據，請確認代碼是否正確。")
+
 
 
