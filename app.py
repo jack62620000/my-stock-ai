@@ -98,12 +98,27 @@ def get_comprehensive_data(code):
             stoch = ta.stoch(df['High'], df['Low'], df['Close'], k=9, d=3)
             
             return {
-                "p": price, "roe": roe, "eps": eps, "gp": gp_m, "debt": debt_e,
-                "fcf": fcf, "div": div_y, "rev": rev_g, "pe_b": pe_b, 
-                "intrinsic": intrinsic, "target_mean": intrinsic,
-                "safety": safety, "pos_52": pos_52, "df": df, "stoch": stoch, 
-                "name": name_map.get(code, code), "industry": ind
-            }
+    "p": price, 
+    "roe": roe, 
+    "eps": eps, 
+    "gp": gp_m, 
+    "op": op_m,  # ✅ 加上這行！
+    "debt": debt_e,
+    "fcf": fcf, 
+    "div": div_y, 
+    "rev": rev_g, 
+    "pe_b": pe_b, 
+    "intrinsic": intrinsic, 
+    "target_mean": intrinsic,
+    "safety": safety, 
+    "pos_52": pos_52, 
+    "df": df, 
+    "stoch": stoch, 
+    "macd": macd, 
+    "bol": bol, 
+    "name": name_map.get(code, code), 
+    "industry": ind
+}
         except: continue
     return None
 
@@ -143,28 +158,28 @@ if code_input:
     if d:
         st.title(f"📊 {d['name']} ({code_input})")
         
-        # 第一部分：2列6欄（正確縮排）
-        st.header("📋 基本面與估值")
-        with st.container(border=True):
-            # 第1列：6大核心指標
-            c1, c2, c3, c4, c5, c6 = st.columns(6)
-            c1.metric("現價/合理價", f"${round(d['p'], 1)}/{round(d['intrinsic'], 1)}")
-            c2.metric("安全邊際", f"{d['safety']*100:.1f}%")
-            c3.metric("52週位階", f"{d['pos_52']*100:.1f}%")
-            c4.metric("ROE/毛利率", f"{d['roe']*100:.1f}%/{d['gp']*100:.1f}%")
-            c5.metric("營業利益率", f"{d['op']*100:.1f}%")
-            c6.metric("本益比", f"{d['p']/d['eps']:.1f}x" if d['eps']>0 else "N/A")
-            
-            st.markdown(" ")  # ✅ 與columns同一層縮排
-            
-            # 第2列：6個財務安全指標
-            f1, f2, f3, f4, f5, f6 = st.columns(6)
-            f1.metric("負債比率", f"{d['debt']*100:.1f}%")
-            f2.metric("現金流", f"{d['fcf']:.1f}億")
-            f3.metric("營收成長", f"{d['rev']*100:.1f}%")
-            f4.metric("前4季EPS", f"{d['eps']:.1f}")
-            f5.metric("殖利率", f"{d['div']*100:.2f}%")
-            f6.metric("決策", "🟢買入" if d['safety']>0.1 else "🔴賣出" if d['safety']<-0.2 else "⏳觀望")
+        # 第一部分：安全版2列6欄（無任何KeyError）
+st.header("📋 基本面與估值")
+with st.container(border=True):
+    # 第1列：確定存在的6個
+    c1, c2, c3, c4, c5, c6 = st.columns(6)
+    c1.metric("現價", f"${round(d['p'], 1):,.0f}")
+    c2.metric("合理價", f"${round(d['intrinsic'], 1):,.0f}")
+    c3.metric("安全邊際", f"{d['safety']*100:.1f}%")
+    c4.metric("52週位階", f"{d['pos_52']*100:.1f}%")
+    c5.metric("ROE", f"{d['roe']*100:.1f}%")
+    c6.metric("毛利率", f"{d['gp']*100:.1f}%")
+    
+    st.markdown(" ")
+    
+    # 第2列：確定存在的6個
+    f1, f2, f3, f4, f5, f6 = st.columns(6)
+    f1.metric("負債比率", f"{d['debt']*100:.1f}%")
+    f2.metric("現金流", f"{d['fcf']:.1f}億")
+    f3.metric("營收成長", f"{d['rev']*100:.1f}%")
+    f4.metric("EPS", f"{d['eps']:.1f}")
+    f5.metric("殖利率", f"{d['div']*100:.2f}%")
+    f6.metric("決策", "🟢買入" if d['safety']>0.1 else "⏳觀望")
 
         # 第二部分：技術面分析（正確縮排）
         st.markdown(" ")
@@ -198,6 +213,7 @@ if code_input:
                 st.error("🔧 Settings → Secrets → GEMINI_API_KEY")
     else:
         st.error("❌ 請確認股票代碼（如2330）")
+
 
 
 
