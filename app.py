@@ -1,68 +1,4 @@
-import streamlit as st
-import yfinance as yf
-import pandas as pd
-import pandas_ta as ta
-import google.generativeai as genai
-
-# 1. 基礎頁面設定
-st.set_page_config(page_title="台股 AI 診斷報告", layout="wide")
-
-# 2. 數據抓取函式
-def get_stock_data(code):
-    for suffix in [".TW", ".TWO"]:
-        try:
-            ticker = yf.Ticker(f"{code}{suffix}")
-            df = ticker.history(period="1y")
-            if df.empty: continue
-            info = ticker.info
-            return {
-                "p": df['Close'].iloc[-1],
-                "df": df,
-                "eps": info.get('trailingEps') or info.get('forwardEps') or 0,
-                "roe": info.get('returnOnEquity', 0),
-                "name": info.get('shortName') or info.get('longName') or code
-            }
-        except: continue
-    return None
-
-# 3. UI 介面
-st.sidebar.title("📈 控制面板")
-code_input = st.sidebar.text_input("輸入股票代碼", value="3131").strip()
-
-if code_input:
-    d = get_stock_data(code_input)
-    
-    if d:
-        st.title(f"📊 {d['name']} ({code_input}) 診斷報告")
-        
-        # --- 第一部分：數據指標 ---
-        intrinsic = d['eps'] * 20 
-        safety = (intrinsic / d['p']) - 1 if d['p'] > 0 else 0
-        
-        with st.container(border=True):
-            m1, m2, m3, m4 = st.columns(4)
-            m1.metric("目前股價", f"{round(d['p'], 1)} 元")
-            m2.metric("合理價(估)", f"{round(intrinsic, 1)} 元")
-            m3.metric("安全邊際", f"{round(safety*100, 1)}%")
-            m4.metric("ROE", f"{round(d['roe']*100, 2)}%")
-
-        # --- 第二部分：技術分析 ---
-        st.header("📉 技術走勢分析")
-        df = d['df'].copy()
-        df['MA20'] = ta.sma(df['Close'], length=20)
-        latest = df.iloc[-1]
-        ma20_val = latest['MA20'] if not pd.isna(latest['MA20']) else d['p']
-        
-        with st.container(border=True):
-            t1, t2, t3 = st.columns(3)
-            t1.write(f"**月線(MA20):** {round(ma20_val, 1)}")
-            t2.write(f"**52週高點:** {round(df['High'].max(), 1)}")
-            if d['p'] > ma20_val:
-                t3.success("多頭趨勢")
-            else:
-                t3.warning("空頭整理")
-
-        # --- 第三部分：Gemini AI 診斷 (自動偵測模型版) ---
+# --- 第三部分：Gemini AI 專家點評 (穩定免費版) ---
         st.divider()
         st.subheader("🤖 Gemini AI 專家點評")
         
@@ -72,28 +8,24 @@ if code_input:
             try:
                 genai.configure(api_key=api_key.strip())
                 
-                # 1. 自動找尋妳帳號目前可用的模型
-                available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+                # 直接指定免費額度最高的 1.5-flash
+                # 如果還是報 429，代表妳的 Google 帳號需要等待約 30 分鐘讓額度生效
+                model = genai.GenerativeModel('gemini-1.5-flash')
                 
-                if available_models:
-                    # 優先找 flash，找不到就找 pro，再找不到就用第一個
-                    target_model = next((m for m in available_models if 'gemini-1.5-flash' in m), 
-                                      next((m for m in available_models if 'gemini-pro' in m), 
-                                      available_models[0]))
-                    
-                    model = genai.GenerativeModel(target_model)
-                    prompt = f"妳是台股專家，請分析{d['name']}({code_input})，目前價格{d['p']}元，請給出一句30字內的短線建議。"
-                    
-                    response = model.generate_content(prompt)
-                    
-                    if response and response.text:
-                        st.info(f"使用模型 ({target_model}):\n\n{response.text}")
-                    else:
-                        st.warning("AI 已連線但未回傳內容。")
+                prompt = f"妳是專業分析師。分析台股{d['name']}({code_input})，目前價格{d['p']}，請給出20字建議。"
+                
+                response = model.generate_content(prompt)
+                
+                if response and response.text:
+                    st.info(response.text)
                 else:
-                    st.error("❌ 妳的 API Key 目前沒有可用模型，請確認 Google AI Studio 權限。")
+                    st.warning("AI 暫時沒有回傳文字，請稍後再試。")
                     
             except Exception as error:
-                st.error(f"⚠️ 連線細節：{str(error)}")
+                err_str = str(error)
+                if "429" in err_str:
+                    st.error("⚠️ 免費額度已達上限或帳號尚未開通。請等待 1 分鐘後再重新整理網頁。")
+                else:
+                    st.error(f"連線細節：{err_str[:100]}")
         else:
             st.error("🔑 尚未在 Secrets 中設定 GEMINI_API_KEY")
