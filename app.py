@@ -94,7 +94,7 @@ def get_buffett_pro_analysis(d, code, api_key):
         【⚠️ 重要執行指令】：
         1. 請直接從「1. 🌍【全球局勢與宏觀風險分析】」開始撰寫，不要有任何前言、開場白（例如：以下是針對...的報告）。
         2. 內容要犀利、專業，直接進入重點。
-        
+        """
         response = model.generate_content(prompt)
         return response.text, target_model
     except Exception as e:
@@ -120,6 +120,7 @@ if code_input:
             st.error("🔑 請設定 API Key")
     else:
         st.warning("❌ 抓不到數據。")
+
 
 
 
