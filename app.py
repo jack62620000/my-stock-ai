@@ -56,7 +56,7 @@ def get_buffett_pro_analysis(d, code, api_key):
     try:
         genai.configure(api_key=api_key.strip())
         available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        target_model = next((m for m in available_models if '1.5-flash' in m), available_models[0])
+        target_model = "models/gemini-1.5-flash"
         model = genai.GenerativeModel(target_model)
         
         lt = d['latest_tech']
@@ -117,5 +117,6 @@ if code_input:
             st.error("🔑 請設定 API Key")
     else:
         st.warning("❌ 抓不到數據，請確認代碼。")
+
 
 
