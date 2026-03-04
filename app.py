@@ -143,34 +143,35 @@ if code_input:
     if d:
         st.title(f"📊 {d['name']} ({code_input})")
         
-        # 第一部分：全Metric版
-st.header("📋 基本面與估值")
-with st.container(border=True):
-    v1, v2, v3, v4 = st.columns(4)
-    v1.metric("現價", f"${round(d['p'], 1):,.0f}")
-    v2.metric("合理價", f"${round(d['intrinsic'], 1):,.0f}", f"PE{d['pe_b']:.1f}")
-    v3.metric("安全邊際", f"{d['safety']*100:.1f}%")
-    v4.metric("52週", f"{d['pos_52']*100:.1f}%")
-    
-    st.markdown(" ") 
-    f1, f2, f3, f4 = st.columns(4)
-    f1.metric("ROE", f"{d['roe']*100:.1f}%")
-    f2.metric("現金流", f"{d['fcf']:.1f}億")
-    f3.metric("營收成長", f"{d['rev']*100:.1f}%")
-    f4.metric("決策", "🟢買入" if d['safety']>0.1 else "⏳觀望")
-        
-        # 第二部分：全Metric版  
-st.markdown(" ")
-st.header("📉 技術面分析")
-df, latest = d['df'], d['df'].iloc[-1]
-with st.container(border=True):
-    t1, t2, t3, t4 = st.columns(4)
-    bias = (d['p'] / latest['MA20'] - 1) * 100
-    t1.metric("月線乖離", f"{bias:.1f}%")
-    t2.metric("RSI", f"{latest['RSI']:.0f}")
-    k, dv = d['stoch'].iloc[-1, 0], d['stoch'].iloc[-1, 1]
-    t3.metric("KD", f"K{k:.0f}")
-    t4.metric("趨勢", "強勢" if d['p'] > latest['MA20'] else "弱勢")
+        # 第一部分：基本面與估值（正確縮排）
+        st.header("📋 基本面與估值")
+        with st.container(border=True):
+            v1, v2, v3, v4 = st.columns(4)
+            v1.metric("現價", f"${round(d['p'], 1):,.0f}")
+            v2.metric("合理價", f"${round(d['intrinsic'], 1):,.0f}", f"PE{d['pe_b']:.1f}")
+            v3.metric("安全邊際", f"{d['safety']*100:.1f}%")
+            v4.metric("52週", f"{d['pos_52']*100:.1f}%")
+            
+            st.markdown(" ")  # ✅ 正確縮排（與metric同級）
+            
+            f1, f2, f3, f4 = st.columns(4)
+            f1.metric("ROE", f"{d['roe']*100:.1f}%")
+            f2.metric("現金流", f"{d['fcf']:.1f}億")
+            f3.metric("營收成長", f"{d['rev']*100:.1f}%")
+            f4.metric("決策", "🟢買入" if d['safety']>0.1 else "⏳觀望")
+
+        # 第二部分：技術面分析（正確縮排）
+        st.markdown(" ")
+        st.header("📉 技術面分析")
+        df, latest = d['df'], d['df'].iloc[-1]
+        with st.container(border=True):
+            t1, t2, t3, t4 = st.columns(4)
+            bias = (d['p'] / latest['MA20'] - 1) * 100
+            t1.metric("月線乖離", f"{bias:.1f}%")
+            t2.metric("RSI", f"{latest['RSI']:.0f}")
+            k, dv = d['stoch'].iloc[-1, 0], d['stoch'].iloc[-1, 1]
+            t3.metric("KD", f"K{k:.0f}")
+            t4.metric("趨勢", "強勢" if d['p'] > latest['MA20'] else "弱勢")
         
         # 第三部分
         st.markdown(" ")
@@ -191,4 +192,5 @@ with st.container(border=True):
                 st.error("🔧 Settings → Secrets → GEMINI_API_KEY")
     else:
         st.error("❌ 請確認股票代碼（如2330）")
+
 
