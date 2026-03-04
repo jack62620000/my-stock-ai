@@ -79,15 +79,19 @@ def get_ai_analysis_report(d, code, api_key):
         # 1. 配置 API
         genai.configure(api_key=api_key.strip())
         
-        # 2. 自動偵測模型，並排除掉已經爆掉的 2.5 版本
+        # --- 核心修正：強制排除所有帶有 2.5 字樣的模型 ---
         available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
         
-        # 優先尋找 1.5-flash 且名稱中不含 2.5 的模型
+        # 2. 優先找 1.5-flash (且絕對不包含 2.5)
         target_model = next((m for m in available_models if '1.5-flash' in m and '2.5' not in m), None)
         
-        # 如果找不到 1.5-flash，嘗試 1.5-pro
+        # 3. 如果沒了，找 1.5-pro (pro 的額度通常是獨立的 50 次/日)
         if not target_model:
             target_model = next((m for m in available_models if '1.5-pro' in m), None)
+            
+        # 4. 萬不得已，才抓清單第一個 (跳過 2.5)
+        if not target_model:
+             target_model = next((m for m in available_models if '2.5' not in m), available_models[0])
         
         # 如果還是找不到，才隨便抓一個，或是報錯
         if not target_model:
@@ -209,6 +213,7 @@ if code_input:
 
     else:
         st.error("❌ 抓不到數據，請確認代碼是否正確。")
+
 
 
 
