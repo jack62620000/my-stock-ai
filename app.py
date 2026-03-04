@@ -76,14 +76,17 @@ def get_comprehensive_data(code):
 @st.cache_data(ttl=86400)
 def get_ai_analysis_report(d, code, api_key):
     try:
-        # 1. 配置 API
+        # 1. 初始化配置
         genai.configure(api_key=api_key.strip())
         
-        # 2. 強制指定最穩定的模型名稱 (不加 models/ 前綴)
-        # 這是目前最能避開 404 錯誤的寫法
-        model = genai.GenerativeModel('gemini-1.5-flash') 
+        # 2. 絕對路徑修正：直接使用純字串名稱
+        # 這是最不容易觸發 404 models/models/ 重複路徑的寫法
+        model_name = 'gemini-1.5-flash' 
         
-        # 3. 準備數據 (確保與 get_comprehensive_data 完全對齊)
+        # 如果你之前一直報 404，可以試試看把上面這行換成 'gemini-pro'
+        model = genai.GenerativeModel(model_name)
+        
+        # 3. 準備數據 (確保與 get_comprehensive_data 字典 Key 完全一致)
         lt = d['df'].iloc[-1]
         k_val = d['stoch'].iloc[-1, 0]
         d_val = d['stoch'].iloc[-1, 1]
@@ -116,8 +119,8 @@ def get_ai_analysis_report(d, code, api_key):
         return response.text
 
     except Exception as e:
-        # 捕捉細節，看看到底是額度還是路徑問題
-        return f"⚠️ 診斷發生錯誤：{str(e)}"
+        # 捕捉細節：如果還是報錯，讓你知道是哪邊斷掉
+        return f"⚠️ AI 診斷目前無法連線：{str(e)}"
 
 # --- 4. UI 介面 ---
 code_input = st.sidebar.text_input("🔍 輸入台股代碼", placeholder="3131").strip()
@@ -194,6 +197,7 @@ if code_input:
 
     else:
         st.error("❌ 抓不到數據，請確認代碼是否正確。")
+
 
 
 
