@@ -1,100 +1,70 @@
 import streamlit as st
 import yfinance as yf
-import pandas as pd
-import pandas_ta as ta
 import google.generativeai as genai
 
-# 1. 基礎頁面設定
-st.set_page_config(page_title="台股 AI 診斷報告", layout="wide")
+# 1. 頁面標題與樣式
+st.set_page_config(page_title="台股 AI 專家點評", layout="centered")
+st.title("🤖 台股 AI 智慧分析")
+st.caption("輸入代碼，立即獲取 Gemini AI 的投資點評")
 
-# 2. 數據抓取函式 (極致防錯版)
-def fetch_data(code):
-    # 優先嘗試 .TWO (上櫃) 再嘗試 .TW (上市)
-    for suffix in [".TWO", ".TW"]:
+# 2. 側邊欄與輸入
+code = st.text_input("🔍 請輸入台股代碼 (例如: 2330, 3131)", value="2330").strip()
+
+# 3. 數據抓取函式 (僅抓取關鍵數值供 AI 參考)
+def get_ai_data(code):
+    for suffix in [".TW", ".TWO"]:
         try:
             ticker = yf.Ticker(f"{code}{suffix}")
-            # 抓取 2 年資料確保指標計算正確
-            df = ticker.history(period="2y")
+            df = ticker.history(period="1mo")
+            if df.empty: continue
             
-            if df.empty or len(df) < 20:
-                continue
-            
-            # 嘗試取得 info，若失敗則給予基本字典預設值
-            try:
-                info = ticker.info
-            except:
-                info = {}
-                
+            info = ticker.info
             return {
-                "p": df['Close'].iloc[-1],
-                "info": info,
-                "df": df,
-                "name": info.get('shortName') or info.get('longName') or f"台股 {code}"
+                "name": info.get('shortName') or info.get('longName') or f"台股 {code}",
+                "price": df['Close'].iloc[-1],
+                "roe": info.get('returnOnEquity', 0),
+                "pe": info.get('trailingPE', 0),
+                "rev_growth": info.get('revenueGrowth', 0)
             }
-        except:
-            continue
+        except: continue
     return None
 
-# 3. 側邊欄輸入
-st.sidebar.header("⚙️ 控制面板")
-code_input = st.sidebar.text_input("🔍 輸入台股代碼", value="3131").strip()
-
-# 4. 邏輯處理
-if code_input:
-    data = fetch_data(code_input)
-    
-    if data:
-        st.title(f"📊 {data['name']} ({code_input}) 診斷報告")
+# 4. 執行 AI 分析
+if code:
+    with st.spinner('AI 正在讀取數據並撰寫報告...'):
+        data = get_ai_data(code)
         
-        # --- 第一部分：數據指標 ---
-        info = data['info']
-        # 強化資料防禦：如果抓不到 EPS，給予 10 或是從股價反推
-        eps = info.get('trailingEps') or info.get('forwardEps') or 1
-        roe_val = info.get('returnOnEquity') or 0.1 # 找不到就預設 10%
-        
-        intrinsic = eps * 22.5 
-        safety = (intrinsic / data['p']) - 1
-        
-        with st.container(border=True):
-            m1, m2, m3, m4 = st.columns(4)
-            m1.metric("目前股價", f"{round(data['p'], 1)} 元")
-            m2.metric("合理價(估)", f"{round(intrinsic, 1)} 元")
-            m3.metric("安全邊際", f"{round(safety*100, 1)}%")
-            m4.metric("ROE", f"{round(roe_val*100, 2)}%")
-
-        # --- 第二部分：技術分析 ---
-        df = data['df'].copy()
-        df['MA20'] = ta.sma(df['Close'], length=20)
-        df['RSI'] = ta.rsi(df['Close'], length=14)
-        latest = df.iloc[-1]
-        ma20_p = latest['MA20'] if not pd.isna(latest['MA20']) else data['p']
-        
-        with st.container(border=True):
-            t1, t2, t3, t4 = st.columns(4)
-            t1.write(f"**月線(MA20):** {round(ma20_p, 1)}")
-            t2.write(f"**RSI(14):** {round(latest['RSI'], 1) if not pd.isna(latest['RSI']) else '計算中'}")
-            t3.write(f"**52週最高:** {round(df['High'].max(), 1)}")
-            if data['p'] > ma20_p:
-                t4.success("📈 多頭趨勢")
+        if data:
+            api_key = st.secrets.get("GEMINI_API_KEY")
+            if api_key:
+                try:
+                    genai.configure(api_key=api_key.strip())
+                    model = genai.GenerativeModel('gemini-1.5-flash')
+                    
+                    # 餵給 AI 的背景資料 (使用者看不到，只有 AI 看得到)
+                    prompt = f"""
+                    你是專業台股分析師。請針對以下數據進行點評：
+                    股票：{data['name']}({code})
+                    現價：{round(data['price'], 1)}
+                    ROE：{round(data['roe']*100, 2)}%
+                    本益比：{round(data['pe'], 2)}
+                    營收成長：{round(data['rev_growth']*100, 2)}%
+                    
+                    請用 50 字內，針對這檔股票給出毒辣且精準的短線與長線操作建議。
+                    """
+                    
+                    response = model.generate_content(prompt)
+                    
+                    # 5. 僅顯示 AI 點評結果
+                    st.chat_message("assistant").write(f"### 📋 {data['name']} ({code}) 診斷結果")
+                    st.info(response.text)
+                    
+                except Exception as e:
+                    st.error("⚠️ AI 暫時無法連線，請稍後再試。")
             else:
-                t4.warning("📉 觀望為宜")
-
-        # --- 第三部分：Gemini AI 點評 ---
-        st.divider()
-        st.subheader("🤖 Gemini AI 專家點評")
-        api_key = st.secrets.get("GEMINI_API_KEY")
-        
-        if api_key:
-            try:
-                genai.configure(api_key=api_key.strip())
-                model = genai.GenerativeModel('gemini-1.5-flash')
-                prompt = f"你是專家。分析{data['name']}({code_input})，股價{data['p']}，ROE{round(roe_val*100,1)}%。請給30字建議。"
-                response = model.generate_content(prompt)
-                st.info(response.text)
-            except:
-                st.error("AI 暫時無法回應，可能是額度已滿。")
+                st.error("🔑 尚未設定 API Key")
         else:
-            st.error("🔑 請在 Secrets 設定 GEMINI_API_KEY")
-            
-    else:
-        st.error(f"❌ 抓取失敗。Yahoo Finance 目前不給看 {code_input}。請等 10 秒後重新輸入，或換個代碼試試（例如 2330）。")
+            st.error("❌ 找不到該股票數據，請確認代碼是否正確。")
+
+st.divider()
+st.caption("註：本分析由 AI 自動生成，僅供參考，不代表投資建議。")
