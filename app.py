@@ -75,8 +75,19 @@ def get_comprehensive_data(code):
 def get_ai_analysis_report(d, code, api_key):
     try:
         genai.configure(api_key=api_key.strip())
-        # 避開 2.0-flash 額度限制，優先找 1.5-flash
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        
+        # --- 核心修復：自動偵測妳的 Key 擁有的模型路徑 ---
+        available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        
+        # 優先尋找包含 '1.5-flash' 的模型名 (可能是 models/gemini-1.5-flash 或 gemini-1.5-flash-latest)
+        target_model = next((m for m in available_models if '1.5-flash' in m), None)
+        
+        # 如果找不到 1.5-flash，就抓清單中第一個可用的 (通常是 1.0 或 1.5-pro)
+        if not target_model:
+            target_model = available_models[0] if available_models else "models/gemini-pro"
+            
+        model = genai.GenerativeModel(target_model)
+        # ----------------------------------------------
         
         latest = d['df'].iloc[-1]
         k, dv = d['stoch'].iloc[-1, 0], d['stoch'].iloc[-1, 1]
@@ -99,7 +110,7 @@ def get_ai_analysis_report(d, code, api_key):
         response = model.generate_content(prompt)
         return response.text
     except Exception as e:
-        return f"AI 診斷失敗：{str(e)}"
+        return f"AI 診斷失敗，請確認 API Key 是否正確或額度已滿。錯誤細節：{str(e)}"
 
 # --- 4. UI 介面 ---
 code_input = st.sidebar.text_input("🔍 輸入台股代碼", placeholder="3131").strip()
@@ -176,3 +187,4 @@ if code_input:
 
     else:
         st.error("❌ 抓不到數據，請確認代碼是否正確。")
+
