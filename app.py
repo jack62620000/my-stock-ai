@@ -67,59 +67,69 @@ st.sidebar.markdown("---")
 # --- 2. 核心數據 ---
 @st.cache_data(ttl=300)
 def get_comprehensive_data(code):
-    # ✅ 多重備案：先試熱門股票，再廣搜
-    test_suffixes = [".TW", ".TWO", ".TWO.TW", f"{code}.TW"]
-    
-    for suffix in test_suffixes:
+    for suffix in [".TW", ".TWO"]:
         try:
             ticker = yf.Ticker(f"{code}{suffix}")
-            
-            # ✅ 多期間備案
-            for period in ["1y", "2y", "6mo"]:
-                hist = ticker.history(period=period)
-                if not hist.empty and len(hist) > 50:  # ✅ 至少50天數據
-                    break
-            
-            if hist.empty: 
-                continue
-                
+            hist = ticker.history(period="1y")
+            if hist.empty: continue
             info = ticker.info
+            
             price = hist['Close'].iloc[-1]
             
-            # ✅ 安全數據提取
-            eps = info.get('trailingEps', 0) or 0
-            roe = info.get('returnOnEquity', 0) or 0
-            gp_m = info.get('grossMargins', 0) or 0
-            op_m = info.get('operatingMargins', 0) or 0
-            debt_e = (info.get('debtToEquity', 0) or 0) / 100
-            fcf = (info.get('freeCashflow', 0) or 0) / 100000000
-            div_y = info.get('dividendYield', 0) or 0
-            rev_g = info.get('revenueGrowth', 0) or 0
-            
-            ind = info.get('industry', '')
-            pe_b = 22.5 if "Semiconductor" in ind else 14 if "Financial" in ind else 15
-            intrinsic = eps * pe_b if eps > 0 else price
-            safety = (intrinsic / price) - 1 if price > 0 else 0
-            l_52, h_52 = hist['Low'].min(), hist['High'].max()
-            pos_52 = (price - l_52) / (h_52 - l_52) if h_52 > l_52 else 0
-            
-            df = hist.copy()
-            df['MA20'] = ta.sma(df['Close'], length=20)
-            df['RSI'] = ta.rsi(df['Close'], length=14)
-            stoch = ta.stoch(df['High'], df['Low'], df['Close'], k=9, d=3)
-            
-            return {
-                "p": price, "roe": roe, "eps": eps, "gp": gp_m, "op": op_m,
-                "debt": debt_e, "fcf": fcf, "div": div_y, "rev": rev_g,
-                "pe_b": pe_b, "intrinsic": intrinsic, "target_mean": intrinsic,
-                "safety": safety, "pos_52": pos_52, "df": df, "stoch": stoch,
-                "name": name_map.get(code, f"{code}"), "industry": ind
+            # 🔥 完整財報數據（30+項）
+            financials = {
+                # 價格與估值
+                'p': price,
+                'pe_b': 22.5 if "Semiconductor" in info.get('industry', '') else 15,
+                'intrinsic': info.get('trailingEps', 0) * (22.5 if "Semiconductor" in info.get('industry', '') else 15),
+                'safety': (info.get('trailingEps', 0) * 22.5 / price) - 1 if price > 0 else 0,
+                'pos_52': (price - hist['Low'].min()) / (hist['High'].max() - hist['Low'].min()) if hist['High'].max() > hist['Low'].min() else 0,
+                
+                # 獲利能力
+                'eps': info.get('trailingEps', 0),
+                'forward_eps': info.get('forwardEps', 0),
+                'roe': info.get('returnOnEquity', 0),
+                'gross_margin': info.get('grossMargins', 0),
+                'operating_margin': info.get('operatingMargins', 0),
+                'profit_margin': info.get('profitMargins', 0),
+                
+                # 成長性
+                'revenue_growth': info.get('revenueGrowth', 0),
+                'earnings_growth': info.get('earningsGrowth', 0),
+                
+                # 財務安全
+                'debt_to_equity': info.get('debtToEquity', 0) / 100,
+                'current_ratio': info.get('currentRatio', 0),
+                'quick_ratio': info.get('quickRatio', 0),
+                'fcf': info.get('freeCashflow', 0) / 100000000,
+                
+                # 估值
+                'trailing_pe': info.get('trailingPE', 0),
+                'forward_pe': info.get('forwardPE', 0),
+                'price_to_book': info.get('priceToBook', 0),
+                'peg_ratio': info.get('pegRatio', 0),
+                
+                # 股利
+                'dividend_yield': info.get('dividendYield', 0),
+                'payout_ratio': info.get('payoutRatio', 0),
+                
+                # 技術面
+                'df': hist,
+                'name': name_map.get(code, code)
             }
-        except Exception as e:
-            continue
-    
-    # ✅ 最終備案：用熱門股票測試
-    st.warning(f"⚠️ {code} 暫無數據，顯示範例...")
+            
+            # 計算衍生數據
+            financials['pe_ratio'] = price / max(financials['eps'], 0.01)
+            
+            # 技術指標
+            df = hist.copy()
+            df['RSI'] = ta.rsi(df['Close'], length=14)
+            financials['rsi'] = df['RSI'].iloc[-1]
+            financials['df'] = df
+            
+            return financials
+            
+        except: continue
     return None
 
 # --- 3. AI報告 ---
@@ -158,26 +168,54 @@ if code_input:
     if d:
         st.title(f"📊 {d['name']} ({code_input})")
         
-        # 第一部分：安全版（縮排100%正確）
-        st.header("📋 基本面與估值")
-        with st.container(border=True):
-            c1, c2, c3, c4, c5, c6 = st.columns(6)
-            c1.metric("現價", f"${round(d['p'], 1):,.0f}")
-            c2.metric("合理價", f"${round(d['intrinsic'], 1):,.0f}")
-            c3.metric("安全邊際", f"{d['safety']*100:.1f}%")
-            c4.metric("52週位階", f"{d['pos_52']*100:.1f}%")
-            c5.metric("ROE", f"{d['roe']*100:.1f}%")
-            c6.metric("毛利率", f"{d['gp']*100:.1f}%")
-
-            st.markdown(" ")  # ← 關鍵！12格縮排（與columns相同）
-            
-            f1, f2, f3, f4, f5, f6 = st.columns(6)
-            f1.metric("負債比率", f"{d['debt']*100:.1f}%")
-            f2.metric("現金流", f"{d['fcf']:.1f}億")
-            f3.metric("營收成長", f"{d['rev']*100:.1f}%")
-            f4.metric("EPS", f"{d['eps']:.1f}")
-            f5.metric("殖利率", f"{d['div']*100:.2f}%")
-            f6.metric("決策", "🟢買入" if d['safety']>0.1 else "⏳觀望")
+        # 第一部分：5列7欄完整財報
+st.header("📋 完整財報分析")
+with st.container(border=True):
+    # 第1列：價格與估值
+    cols1 = st.columns(7)
+    cols1[0].metric("現價", f"${financials['p']:,.0f}")
+    cols1[1].metric("合理價", f"${financials['intrinsic']:,.0f}")
+    cols1[2].metric("安全邊際", f"{financials['safety']*100:.1f}%")
+    cols1[3].metric("52週位階", f"{financials['pos_52']*100:.1f}%")
+    cols1[4].metric("本益比", f"{financials['pe_ratio']:.1f}x")
+    cols1[5].metric("前瞻P/E", f"{financials['forward_pe']:.1f}x")
+    cols1[6].metric("P/B比", f"{financials['price_to_book']:.1f}x")
+    
+    st.markdown(" ")
+    
+    # 第2列：獲利能力
+    cols2 = st.columns(7)
+    cols2[0].metric("ROE", f"{financials['roe']*100:.1f}%")
+    cols2[1].metric("毛利率", f"{financials['gross_margin']*100:.1f}%")
+    cols2[2].metric("營業利益率", f"{financials['operating_margin']*100:.1f}%")
+    cols2[3].metric("淨利率", f"{financials['profit_margin']*100:.1f}%")
+    cols2[4].metric("過去EPS", f"{financials['eps']:.2f}")
+    cols2[5].metric("預估EPS", f"{financials['forward_eps']:.2f}")
+    cols2[6].metric("PEG", f"{financials['peg_ratio']:.2f}x")
+    
+    st.markdown(" ")
+    
+    # 第3列：成長性
+    cols3 = st.columns(7)
+    cols3[0].metric("營收成長", f"{financials['revenue_growth']*100:.1f}%")
+    cols3[1].metric("盈餘成長", f"{financials['earnings_growth']*100:.1f}%")
+    cols3[2].metric("現金流", f"{financials['fcf']:.1f}億")
+    cols3[3].metric("殖利率", f"{financials['dividend_yield']*100:.2f}%")
+    cols3[4].metric("配發率", f"{financials['payout_ratio']*100:.1f}%")
+    cols3[5].metric("RSI", f"{financials['rsi']:.0f}")
+    cols3[6].metric("產業", financials['industry'][:15])
+    
+    st.markdown(" ")
+    
+    # 第4列：財務安全
+    cols4 = st.columns(7)
+    cols4[0].metric("負債權益比", f"{financials['debt_to_equity']*100:.1f}%")
+    cols4[1].metric("流動比率", f"{financials['current_ratio']:.2f}x")
+    cols4[2].metric("速動比率", f"{financials['quick_ratio']:.2f}x")
+    cols4[3].metric("追蹤P/E", f"{financials['trailing_pe']:.1f}x")
+    cols4[4].metric("現金", f"{info.get('totalCash',0)/100000000:.1f}億")
+    cols4[5].metric("總負債", f"{info.get('totalDebt',0)/100000000:.1f}億")
+    cols4[6].metric("決策", "🟢買入" if financials['safety']>0.1 else "⏳觀望")
 
         # 第二部分：技術面分析（正確縮排）
         st.markdown(" ")
@@ -211,6 +249,7 @@ if code_input:
                 st.error("🔧 Settings → Secrets → GEMINI_API_KEY")
     else:
         st.error("❌ 請確認股票代碼（如2330）")
+
 
 
 
