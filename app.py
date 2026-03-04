@@ -76,16 +76,24 @@ def get_comprehensive_data(code):
 @st.cache_data(ttl=86400)
 def get_ai_analysis_report(d, code, api_key):
     try:
-        # 1. 初始化配置 (確保去除多餘空格)
+        # 1. 初始化配置 (清理 API Key)
         genai.configure(api_key=api_key.strip())
         
-        # 2. 核心修正：直接宣告模型物件
-        # 不要寫 models/gemini-1.5-flash，因為 SDK 會幫你加
-        # 如果 1.5-flash 還是 404，請手動改成 'gemini-1.5-pro' 或 'gemini-pro'
-        try:
-            model = genai.GenerativeModel('gemini-1.5-flash')
-        except:
-            model = genai.GenerativeModel('gemini-pro') 
+        # 2. 依照 Stack Overflow 的建議，依序嘗試最新的穩定模型
+        # 不加 models/ 前綴，直接使用模型字串，讓 SDK 自己處理版本
+        candidate_models = ['gemini-1.5-flash', 'gemini-2.5-flash', 'gemini-pro']
+        model = None
+        
+        for m_name in candidate_models:
+            try:
+                model = genai.GenerativeModel(m_name)
+                # 測試建立是否成功，若不噴錯就用這個
+                break
+            except:
+                continue
+        
+        if not model:
+            return "❌ 嘗試了所有已知模型均失敗，請檢查 API Key 或更新 requirements.txt。"
 
         # 3. 準備數據 (確保與 get_comprehensive_data 字典 Key 完全一致)
         lt = d['df'].iloc[-1]
@@ -120,7 +128,6 @@ def get_ai_analysis_report(d, code, api_key):
         return response.text
 
     except Exception as e:
-        # 捕捉細節：如果還是報錯，讓你知道是哪邊斷掉
         return f"⚠️ AI 診斷目前無法連線：{str(e)}"
 
 # --- 4. UI 介面 ---
@@ -198,6 +205,7 @@ if code_input:
 
     else:
         st.error("❌ 抓不到數據，請確認代碼是否正確。")
+
 
 
 
