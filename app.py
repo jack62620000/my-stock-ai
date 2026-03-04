@@ -62,7 +62,23 @@ if code_input:
             else:
                 t3.warning("空頭整理")
 
-        # --- 第三部分：Gemini AI 診斷 ---
+       看到這個 404 錯誤（即使妳已經換了新 Key），這代表妳所在的 API 區域或目前的專案設定，無法透過 v1beta 這個預設路徑找到 gemini-1.5-flash。
+
+這在 Google AI Studio 的新帳號中偶爾會發生。我們現在用最後一個、也是最粗暴但有效的解決方法：「不指定型號，讓程式去列出妳帳號下所有能用的名字」，然後直接抓第一個來用。
+
+🛠️ 請將 app.py 的「第三部分」換成這段：
+這段代碼會先問 Google：「喂，妳現在到底准許我用哪一個模型？」然後直接跟它溝通。
+
+Python
+        看到這個 404 錯誤（即使妳已經換了新 Key），這代表妳所在的 API 區域或目前的專案設定，無法透過 v1beta 這個預設路徑找到 gemini-1.5-flash。
+
+這在 Google AI Studio 的新帳號中偶爾會發生。我們現在用最後一個、也是最粗暴但有效的解決方法：「不指定型號，讓程式去列出妳帳號下所有能用的名字」，然後直接抓第一個來用。
+
+🛠️ 請將 app.py 的「第三部分」換成這段：
+這段代碼會先問 Google：「喂，妳現在到底准許我用哪一個模型？」然後直接跟它溝通。
+
+Python
+        # --- 第三部分：Gemini AI 專家點評 (終極相容版) ---
         st.divider()
         st.subheader("🤖 Gemini AI 專家點評")
         
@@ -71,24 +87,35 @@ if code_input:
         if api_key:
             try:
                 genai.configure(api_key=api_key.strip())
-                model = genai.GenerativeModel('gemini-1.5-flash')
                 
-                prompt = f"妳是專業台股分析師。分析{d['name']}({code_input})，股價{d['p']}。請用20字給出短線戰術。"
-                response = model.generate_content(prompt)
+                # 1. 自動抓取妳帳號下所有支援「生成內容」的模型清單
+                available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
                 
-                if response and response.text:
-                    st.info(response.text)
-                else:
-                    st.warning("AI 已連線但未回傳內容，請重新整理。")
+                if available_models:
+                    # 2. 從清單中選一個（優先找 flash，沒有就找 pro，再沒有就抓第一個）
+                    selected_model_name = next((m for m in available_models if '1.5-flash' in m), 
+                                             next((m for m in available_models if 'pro' in m), 
+                                             available_models[0]))
                     
-            except Exception as e:
-                err_msg = str(e)
-                if "429" in err_msg:
-                    st.error("⚠️ 額度用完或尚未開通，請等待 1 分鐘後再重新整理。")
+                    model = genai.GenerativeModel(selected_model_name)
+                    
+                    # 3. 測試呼叫
+                    prompt = f"妳是台股專家，請分析{d['name']}({code_input})，股價{d['p']}，給出一句20字內建議。"
+                    response = model.generate_content(prompt)
+                    
+                    if response and response.text:
+                        st.info(f"模型 ({selected_model_name.split('/')[-1]}) 診斷：\n\n{response.text}")
+                    else:
+                        st.warning("AI 已連線但未回傳內容。")
                 else:
-                    st.error(f"⚠️ 連線細節：{err_msg[:100]}")
+                    st.error("❌ 妳的 API Key 目前沒有可用模型，請確認 Google AI Studio 帳號狀態。")
+                    
+            except Exception as error:
+                err_str = str(error)
+                if "429" in err_str:
+                    st.error("⚠️ 額度已滿，請等 1 分鐘後再重新整理。")
+                else:
+                    st.error(f"⚠️ 連線細節：{err_str[:100]}")
         else:
             st.error("🔑 尚未在 Secrets 中設定 GEMINI_API_KEY")
-            
-    else:
-        st.error("❌ 無法抓取數據，請確認代碼是否正確。")
+
