@@ -64,43 +64,36 @@ if code_input:
             else:
                 t3.warning("空頭整理")
 
-       # --- 第三部分：Gemini AI 專家點評 (完修版) ---
+       # --- 第三部分：Gemini AI 專家點評 (最終兼容版) ---
         st.divider()
         st.subheader("🤖 Gemini AI 專家點評")
         
         api_key = st.secrets.get("GEMINI_API_KEY")
         if api_key:
             try:
-                # 1. 確保 Key 正確配置
                 genai.configure(api_key=api_key.strip())
                 
-                # 2. 改用 -latest 名稱，這能解決大多數「無法生成內容」的問題
-                model = genai.GenerativeModel('gemini-1.5-flash-latest')
+                # 建立一個測試清單，按優先順序測試
+                # 既然 flash-latest 報 404，我們改試最標準的名稱
+                success = False
+                for model_id in ['gemini-1.5-flash', 'models/gemini-1.5-flash', 'gemini-pro']:
+                    try:
+                        model = genai.GenerativeModel(model_id)
+                        prompt = f"分析台股{code_input}，股價{d['p']}，請給出一句20字內建議。"
+                        response = model.generate_content(prompt)
+                        
+                        if response and response.text:
+                            st.info(response.text)
+                            success = True
+                            break # 成功了就跳出
+                    except:
+                        continue
                 
-                # 3. 提供極其簡短的指令，降低被過濾的機率
-                # 這裡加入一點點隨機性，強迫伺服器重新計算
-                prompt = f"分析台股{code_input}，現在價格{d['p']}，請給出20字內的具體策略。"
-                
-                # 4. 執行呼叫 (加入 safety_settings 以防萬一)
-                response = model.generate_content(
-                    prompt,
-                    safety_settings=[
-                        {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
-                        {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
-                        {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
-                        {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
-                    ]
-                )
-                
-                # 5. 判斷回傳內容
-                if response and hasattr(response, 'text') and response.text:
-                    st.info(response.text)
-                else:
-                    # 如果 response 存在但沒有 text，通常是權限還在同步
-                    st.warning("⚠️ AI 已連線，但 Google 伺服器尚未準備好回傳資料，請 1 分鐘後重新整理。")
+                if not success:
+                    st.warning("⚠️ AI 暫時無法回應，這通常是 Google API 正在維護中，請稍後再試。")
                     
             except Exception as e:
-                # 顯示更精確的錯誤訊息，方便判斷
-                st.error(f"連線細節：{str(e)}")
+                # 如果連這個測試迴圈都炸了，顯示最後的線索
+                st.error(f"連線異常：{str(e)[:100]}")
         else:
             st.error("🔑 請在 Secrets 中設定 GEMINI_API_KEY")
