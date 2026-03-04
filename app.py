@@ -62,7 +62,7 @@ if code_input:
             else:
                 t3.warning("空頭整理")
 
-        # --- 第三部分：Gemini AI 診斷 ---
+        # --- 第三部分：Gemini AI 診斷 (精準路徑版) ---
         st.divider()
         st.subheader("🤖 Gemini AI 專家點評")
         
@@ -70,27 +70,27 @@ if code_input:
         
         if api_key:
             try:
+                # 1. 基礎配置
                 genai.configure(api_key=api_key.strip())
                 
-                # 同時嘗試兩種名稱，確保解決 404 問題
+                # 2. 直接使用 models/ 前綴，這在某些地區是強制的
+                # 我們優先嘗試最新的 1.5 flash
                 try:
-                    model = genai.GenerativeModel('gemini-1.5-flash')
-                    prompt = f"分析台股{d['name']}({code_input})，股價{d['p']}，給出20字建議。"
+                    model = genai.GenerativeModel('models/gemini-1.5-flash')
+                    prompt = f"你是台股分析師。請用 20 字分析台股 {d['name']}。"
                     response = model.generate_content(prompt)
                 except:
-                    model = genai.GenerativeModel('gemini-pro')
-                    prompt = f"分析台股{d['name']}({code_input})，股價{d['p']}，給出20字建議。"
+                    # 如果失敗，嘗試不帶 models/ 的版本
+                    model = genai.GenerativeModel('gemini-1.5-flash')
                     response = model.generate_content(prompt)
                 
                 if response and response.text:
                     st.info(response.text)
                 else:
-                    st.warning("AI 目前沒有回應內容。")
+                    st.warning("AI 已連線，但內容被過濾，請換個代碼試試。")
                     
             except Exception as error:
+                # 這裡會顯示最終的偵錯訊息
                 st.error(f"⚠️ 連線細節：{str(error)}")
         else:
             st.error("🔑 尚未在 Secrets 中設定 GEMINI_API_KEY")
-            
-    else:
-        st.error("❌ 無法抓取數據，請確認代碼是否正確。")
