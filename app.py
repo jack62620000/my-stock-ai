@@ -37,7 +37,7 @@ st.sidebar.header("⚙️ 控制面板")
 code_input = st.sidebar.text_input("🔍 輸入台股代碼", value="3131").strip()
 
 if code_input:
-    data = fetch_data(code_input
+    data = fetch_data(code_input）
 # 5. UI 介面
 st.sidebar.title("📈 控制面板")
 code_input = st.sidebar.text_input("輸入股票代碼", value="3131").strip()
@@ -120,5 +120,6 @@ if code_input:
             
     else:
         st.error("❌ 無法抓取數據，請確認代碼是否正確。")
+
 
 
