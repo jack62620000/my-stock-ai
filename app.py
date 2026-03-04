@@ -166,45 +166,51 @@ code_input = st.sidebar.text_input("🔍 輸入台股代碼", placeholder="2330"
 if code_input:
     d = get_comprehensive_data(code_input)
     if d:
-        st.title(f"📊 {d['name']} ({code_input}) 全方位診斷")
-
-        # ========== 第一部分：5列7欄完整財報 ==========
-        st.header("📋 第一部分：完整yfinance財報")
+        st.title(f"📊 {d.get('name', code_input)} ({code_input})")
+        
+        # 第一部分：5列7欄（100%安全）
+        st.header("📋 第一部分：完整財報")
         with st.container(border=True):
-            # 第1列：價格估值
-            c1,c2,c3,c4,c5,c6,c7=st.columns(7)
-            c1.metric("現價",f"${round(d['p'],1):,.0f}")
-            c2.metric("合理價",f"${round(d['intrinsic'],1):,.0f}")
-            c3.metric("安全邊際",f"{d['safety']*100:.1f}%")
-            c4.metric("52週",f"{d['pos_52']*100:.1f}%")
-            c5.metric("ROE",f"{d['roe']*100:.1f}%")
-            c6.metric("毛利率",f"{d['gp']*100:.1f}%")
-            pe=d['p']/max(d['eps'],0.01)
-            c7.metric("本益比",f"{pe:.1f}x")
+            # 第1列
+            c1,c2,c3,c4,c5,c6,c7 = st.columns(7)
+            c1.metric("現價", f"${round(d.get('p',0),1):,.0f}")
+            c2.metric("合理價", f"${round(d.get('intrinsic',0),1):,.0f}")
+            c3.metric("安全邊際", f"{d.get('safety',0)*100:.1f}%")
+            c4.metric("52週", f"{d.get('pos_52',0)*100:.1f}%")
+            c5.metric("ROE", f"{d.get('roe',0)*100:.1f}%")
+            c6.metric("毛利率", f"{d.get('gp',0)*100:.1f}%")
+            pe = d.get('p',0) / max(d.get('eps',0.01), 0.01)
+            c7.metric("本益比", f"{pe:.1f}x")
 
             st.markdown(" ")
+
+            # 第2列
+            f1,f2,f3,f4,f5,f6,f7 = st.columns(7)
+            f1.metric("營業利益率", f"{d.get('op',0)*100:.1f}%")
+            f2.metric("負債比率", f"{d.get('debt',0)*100:.1f}%")
+            f3.metric("EPS", f"{d.get('eps',0):.2f}")
+            f4.metric("現金流", f"{d.get('fcf',0):.1f}億")
+            f5.metric("營收成長", f"{d.get('rev',0)*100:.1f}%")
+            f6.metric("殖利率", f"{d.get('div',0)*100:.1f}%")
             
-            # 第2列：獲利能力
-            f1,f2,f3,f4,f5,f6,f7=st.columns(7)
-            f1.metric("營業利益率",f"{d['op']*100:.1f}%")
-            f2.metric("負債比率",f"{d['debt']*100:.1f}%")
-            f3.metric("EPS",f"{d['eps']:.2f}")
-            f4.metric("現金流",f"{d['fcf']:.1f}億")
-            f5.metric("營收成長",f"{d['rev']*100:.1f}%")
-            f6.metric("殖利率",f"{d['div']*100:.1f}%")
-            f7.metric("RSI",f"{d['df']['RSI'].iloc[-1]:.0f}")
+            # RSI安全計算
+            rsi_val = 50
+            if 'df' in d and 'RSI' in d['df'].columns:
+                rsi_val = d['df']['RSI'].iloc[-1]
+            f7.metric("RSI", f"{rsi_val:.0f}")
 
             st.markdown(" ")
-            
-            # 第3列：財務安全
-            s1,s2,s3,s4,s5,s6,s7=st.columns(7)
-            s1.metric("流動比率",f"{d.get('currentRatio','N/A')}")
-            s2.metric("速動比率",f"{d.get('quickRatio','N/A')}")
-            s3.metric("淨利率",f"{d.get('profitMargins',0)*100:.1f}%")
-            s4.metric("盈餘成長",f"{d.get('earningsGrowth',0)*100:.1f}%")
-            s5.metric("前瞻P/E",f"{d.get('forwardPE','N/A')}")
-            s6.metric("P/B比",f"{d.get('priceToBook',0):.1f}x")
-            s7.metric("PEG",f"{d.get('pegRatio','N/A')}")
+
+            # 第3列：使用 d.get() 或 info.get()
+            info = yf.Ticker(f"{code_input}.TW").info if 'yf' not in locals() else {}
+            s1,s2,s3,s4,s5,s6,s7 = st.columns(7)
+            s1.metric("流動比率", f"{info.get('currentRatio','N/A')}")
+            s2.metric("速動比率", f"{info.get('quickRatio','N/A')}")
+            s3.metric("淨利率", f"{info.get('profitMargins',0)*100:.1f}%")
+            s4.metric("盈餘成長", f"{info.get('earningsGrowth',0)*100:.1f}%")
+            s5.metric("前瞻P/E", f"{info.get('forwardPE','N/A')}")
+            s6.metric("P/B", f"{info.get('priceToBook',0):.1f}x")
+            s7.metric("PEG", f"{info.get('pegRatio','N/A')}")
 
         # ========== 第二部分：技術面（原有） ==========
         st.markdown(" ")
@@ -255,6 +261,7 @@ if code_input:
                 st.error("🔧 **設定Cloud Secrets**：App Settings → Secrets → GEMINI_API_KEY")
     else:
         st.error("❌ 請確認股票代碼（如2330、2317）")
+
 
 
 
