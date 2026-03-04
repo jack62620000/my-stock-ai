@@ -189,36 +189,3 @@ if code_input:
 
     else:
         st.error("❌ 抓不到數據，請確認代碼是否正確。")
-
-# ========== 🔥 超簡單中文測試區 ==========
-st.sidebar.markdown("### 🔧 AI模型測試")
-test_key = st.sidebar.text_input("輸入你的Gemini API Key", type="password", help="直接貼API Key測試，不用secrets")
-
-if st.sidebar.button("🚀 立即測試可用模型", type="primary"):
-    if test_key:
-        try:
-            import google.generativeai as genai
-            genai.configure(api_key=test_key.strip())
-            
-            st.sidebar.markdown("### ✅ **找到這些模型可以用！**")
-            st.sidebar.markdown("🔴 把**第一個**複製到程式碼裡")
-            
-            models = []
-            for model in genai.list_models():
-                if 'generateContent' in model.supported_generation_methods:
-                    model_name = model.name.split('/')[-1]  # 只顯示名稱
-                    models.append(model_name)
-                    st.sidebar.success(f"✅ **{model_name}**")
-            
-            if models:
-                st.sidebar.markdown("---")
-                st.sidebar.info(f"**複製這個用：** `{models[0]}`")
-                st.balloons()  # 慶祝成功！
-            else:
-                st.sidebar.error("❌ 沒找到模型")
-                
-        except Exception as e:
-            st.sidebar.error(f"❌ 錯誤：{str(e)[:80]}")
-    else:
-        st.sidebar.warning("👆 先貼入 API Key")
-
