@@ -85,22 +85,40 @@ if code_input:
             with t4:
                 st.write("**【 建議策略 】**")
                 st.success("持股續抱" if data['p'] > latest['MA20'] else "觀望為宜")
-       # --- 第三部分：Gemini AI 診斷 (放在最後，失敗也不影響上面) ---
+       # --- 第三部分：Gemini AI 專家點評 (自動偵測模型版) ---
         st.divider()
         st.subheader("🤖 Gemini AI 專家點評")
         
-        if "GEMINI_API_KEY" in st.secrets:
+        api_key = st.secrets.get("GEMINI_API_KEY")
+        
+        if api_key:
             try:
-                genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-                model = genai.GenerativeModel('gemini-1.5-flash')
-                prompt = f"妳是台股分析師，分析 {data['name']}。股價{data['p']}，ROE {round(info.get('returnOnEquity', 0)*100, 1)}%。請用 50 字內給出投資建議。"
-                response = model.generate_content(prompt)
-                st.info(response.text)
-            except Exception as e:
-                st.warning("AI 目前忙碌中，請稍後重新整理網頁。")
+                genai.configure(api_key=api_key.strip())
+                
+                # 自動找尋可用的模型名稱 (避免 404)
+                available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+                
+                if available_models:
+                    # 優先挑選 flash，沒有就挑第一個
+                    target_model = next((m for m in available_models if '1.5-flash' in m), available_models[0])
+                    model = genai.GenerativeModel(target_model)
+                    
+                    prompt = f"妳是台股專家，請針對 {d['name']}({code_input}) 分析：價格 {d['p']}，ROE {round(d['roe']*100,1)}%。請給出 30 字內的投資建議。"
+                    response = model.generate_content(prompt)
+                    
+                    if response and response.text:
+                        st.info(response.text)
+                    else:
+                        st.warning("AI 已連線但未回傳內容。")
+                else:
+                    st.error("❌ 找不到可用模型，請確認 API Key 權限。")
+                    
+            except Exception as error:
+                st.error(f"⚠️ 連線細節：{str(error)}")
         else:
-            st.error("⚠️ 請在 Streamlit Secrets 設定 GEMINI_API_KEY")
+            st.error("🔑 尚未在 Secrets 中設定 GEMINI_API_KEY")
             
     else:
-        st.error(f"❌ 無法取得 {code_input} 的數據，請檢查代碼是否正確或稍後再試。")
+        st.error("❌ 無法抓取數據，請確認代碼是否正確。")
+
 
