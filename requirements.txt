@@ -3,4 +3,5 @@ yfinance
 pandas
 pandas_ta
 google-generativeai
-lxml
+gspread
+google-auth
