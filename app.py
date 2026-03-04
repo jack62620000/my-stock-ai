@@ -166,101 +166,96 @@ code_input = st.sidebar.text_input("🔍 輸入台股代碼", placeholder="2330"
 if code_input:
     d = get_comprehensive_data(code_input)
     if d:
-    st.title(f"📊 {d['name']} ({code_input}) 全方位財報")
-    
-    # 🔥 5列7欄完整財報（縮排完美）
-    st.header("📋 完整yfinance財報分析")
-    with st.container(border=True):
-        # 第1列：價格估值 (7項)
-        c1,c2,c3,c4,c5,c6,c7 = st.columns(7)
-        c1.metric("現價", f"${round(d['p'],1):,.0f}")
-        c2.metric("合理價", f"${round(d['intrinsic'],1):,.0f}")
-        c3.metric("安全邊際", f"{d['safety']*100:.1f}%")
-        c4.metric("52週", f"{d['pos_52']*100:.1f}%")
-        c5.metric("ROE", f"{d['roe']*100:.1f}%")
-        c6.metric("毛利率", f"{d['gp']*100:.1f}%")
-        c7.metric("本益比", f"{d['p']/max(d['eps'],0.01):.1f}x")
+        st.title(f"📊 {d['name']} ({code_input}) 全方位診斷")
 
-        st.markdown(" ")
-        
-        # 第2列：獲利能力 (7項)  
-        f1,f2,f3,f4,f5,f6,f7 = st.columns(7)
-        f1.metric("營業利益率", f"{d['op']*100:.1f}%")
-        f2.metric("負債比率", f"{d['debt']*100:.1f}%")
-        f3.metric("EPS", f"{d['eps']:.2f}")
-        f4.metric("現金流", f"{d['fcf']:.1f}億")
-        f5.metric("營收成長", f"{d['rev']*100:.1f}%")
-        f6.metric("殖利率", f"{d['div']*100:.1f}%")
-        f7.metric("RSI", f"{d['df']['RSI'].iloc[-1]:.0f}")
+        # ========== 第一部分：5列7欄完整財報 ==========
+        st.header("📋 第一部分：完整yfinance財報")
+        with st.container(border=True):
+            # 第1列：價格估值
+            c1,c2,c3,c4,c5,c6,c7=st.columns(7)
+            c1.metric("現價",f"${round(d['p'],1):,.0f}")
+            c2.metric("合理價",f"${round(d['intrinsic'],1):,.0f}")
+            c3.metric("安全邊際",f"{d['safety']*100:.1f}%")
+            c4.metric("52週",f"{d['pos_52']*100:.1f}%")
+            c5.metric("ROE",f"{d['roe']*100:.1f}%")
+            c6.metric("毛利率",f"{d['gp']*100:.1f}%")
+            pe=d['p']/max(d['eps'],0.01)
+            c7.metric("本益比",f"{pe:.1f}x")
 
-        st.markdown(" ")
-        
-        # 第3列：財務安全 (7項)
-        s1,s2,s3,s4,s5,s6,s7 = st.columns(7)
-        s1.metric("流動比率", f"{info.get('currentRatio',0):.2f}x")
-        s2.metric("速動比率", f"{info.get('quickRatio',0):.2f}x")
-        s3.metric("淨利率", f"{info.get('profitMargins',0)*100:.1f}%")
-        s4.metric("盈餘成長", f"{info.get('earningsGrowth',0)*100:.1f}%")
-        s5.metric("前瞻P/E", f"{info.get('forwardPE',0):.1f}x")
-        s6.metric("P/B比", f"{info.get('priceToBook',0):.1f}x")
-        s7.metric("PEG", f"{info.get('pegRatio',0):.2f}x")
+            st.markdown(" ")
+            
+            # 第2列：獲利能力
+            f1,f2,f3,f4,f5,f6,f7=st.columns(7)
+            f1.metric("營業利益率",f"{d['op']*100:.1f}%")
+            f2.metric("負債比率",f"{d['debt']*100:.1f}%")
+            f3.metric("EPS",f"{d['eps']:.2f}")
+            f4.metric("現金流",f"{d['fcf']:.1f}億")
+            f5.metric("營收成長",f"{d['rev']*100:.1f}%")
+            f6.metric("殖利率",f"{d['div']*100:.1f}%")
+            f7.metric("RSI",f"{d['df']['RSI'].iloc[-1]:.0f}")
 
-        st.markdown(" ")
-        
-        # 第4列：其他財報 (7項)
-        o1,o2,o3,o4,o5,o6,o7 = st.columns(7)
-        o1.metric("配發率", f"{info.get('payoutRatio',0)*100:.1f}%")
-        o2.metric("總現金", f"{info.get('totalCash',0)/1e8:.1f}億")
-        o3.metric("總負債", f"{info.get('totalDebt',0)/1e8:.1f}億")
-        o4.metric("追蹤P/E", f"{info.get('trailingPE',0):.1f}x")
-        o5.metric("P/S比", f"{info.get('priceToSalesTrailing12Months',0):.1f}x")
-        o6.metric("EBITDA邊際", f"{info.get('ebitdaMargins',0)*100:.1f}%")
-        o7.metric("產業", info.get('industry','N/A')[:12])
+            st.markdown(" ")
+            
+            # 第3列：財務安全
+            s1,s2,s3,s4,s5,s6,s7=st.columns(7)
+            s1.metric("流動比率",f"{d.get('currentRatio','N/A')}")
+            s2.metric("速動比率",f"{d.get('quickRatio','N/A')}")
+            s3.metric("淨利率",f"{d.get('profitMargins',0)*100:.1f}%")
+            s4.metric("盈餘成長",f"{d.get('earningsGrowth',0)*100:.1f}%")
+            s5.metric("前瞻P/E",f"{d.get('forwardPE','N/A')}")
+            s6.metric("P/B比",f"{d.get('priceToBook',0):.1f}x")
+            s7.metric("PEG",f"{d.get('pegRatio','N/A')}")
 
+        # ========== 第二部分：技術面（原有） ==========
         st.markdown(" ")
-        
-        # 第5列：決策總結
-        col1,col2,col3,col4,col5,col6,col7 = st.columns(7)
-        col1.metric("總評", "⭐⭐⭐⭐⭐" if d['safety']>0.2 else "⭐⭐⭐⭐" if d['safety']>0 else "⭐⭐⭐")
-        col2.metric("建議", "🟢強力買入" if d['safety']>0.15 else "🟡買入" if d['safety']>0 else "🔴觀望")
-        col3.empty()
-        col4.empty()
-        col5.empty()
-        col6.empty()
-        col7.metric("更新", f"{pd.Timestamp.now().strftime('%m/%d %H:%M')}")
-
-        # 第二部分：技術面分析（正確縮排）
-        st.markdown(" ")
-        st.header("📉 技術面分析")
+        st.header("📉 第二部分：股價走勢與動能分析")
         df, latest = d['df'], d['df'].iloc[-1]
         with st.container(border=True):
             t1, t2, t3, t4 = st.columns(4)
-            bias = (d['p'] / latest['MA20'] - 1) * 100
-            t1.metric("月線乖離", f"{bias:.1f}%")
-            t2.metric("RSI", f"{latest['RSI']:.0f}")
-            k, dv = d['stoch'].iloc[-1, 0], d['stoch'].iloc[-1, 1]
-            t3.metric("KD", f"K{k:.0f}")
-            t4.metric("趨勢", "強勢" if d['p'] > latest['MA20'] else "弱勢")
-        
-        # 第三部分
+            with t1:
+                st.write("**【 均線系統 】**")
+                st.write(f"MA20: {round(latest['MA20'], 1)}")
+                bias = (d['p'] / latest['MA20'] - 1) * 100
+                st.write(f"乖離: {round(bias, 1)}%")
+            with t2:
+                st.write("**【 量能強弱 】**")
+                st.write(f"成交: {int(latest['Volume']/1000)}張")
+                st.write(f"RSI: {round(latest['RSI'], 1)}")
+            with t3:
+                k, dv = d['stoch'].iloc[-1, 0], d['stoch'].iloc[-1, 1]
+                st.write("**【 動能指標 】**")
+                st.write(f"KD: K{round(k,1)} / D{round(dv,1)}")
+                st.write(f"{'🔥金叉' if k>dv else '❄️死叉'}")
+            with t4:
+                st.write("**【 趨勢判定 】**")
+                st.write(f"{'🌕 強勢' if d['p'] > latest['MA20'] else '🌑 弱勢'}")
+                st.write(f"{'持股續抱' if d['p'] > latest['MA20'] else '等待轉強'}")
+
+        # ========== 第三部分：AI診斷（原有） ==========
         st.markdown(" ")
-        st.header("🤖 AI終極診斷")
+        st.header("🤖 第三部分：AI 終極戰情診斷")
         api_status = st.secrets.get("GEMINI_API_KEY")
-        col1, col2 = st.columns([1,4])
-        with col1: st.caption("🟢" if api_status else "🔴")
-        with col2: st.caption("Gemini 2.5")
+        col1, col2 = st.columns([1, 4])
+        with col1:
+            status_icon = "🟢 已連線" if api_status else "🔴 未連線"
+            st.caption(f"**{status_icon}**")
+        with col2:
+            st.caption(f"**Gemini 2.5 Flash**")
         
-        if st.button("🚀 AI深度分析", type="primary", use_container_width=True):
+        if st.button("🚀 啟動 AI 深度診斷", type="primary", use_container_width=True):
             if api_status:
-                with st.spinner(f"分析 {d['name']}..."):
+                with st.spinner(f"🤖 AI 分析 {d['name']}..."):
                     report = get_ai_analysis_report(d, code_input, api_status)
-                    st.markdown("### 📋 AI報告")
+                    st.markdown("### 📋 **AI 終極投資報告**")
+                    st.markdown("---")
                     st.markdown(report)
                     st.balloons()
+                    st.success("✅ AI診斷完成！")
             else:
-                st.error("🔧 Settings → Secrets → GEMINI_API_KEY")
+                st.error("🔧 **設定Cloud Secrets**：App Settings → Secrets → GEMINI_API_KEY")
     else:
-        st.error("❌ 請確認股票代碼（如2330）")
+        st.error("❌ 請確認股票代碼（如2330、2317）")
+
 
 
 
