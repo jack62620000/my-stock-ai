@@ -65,7 +65,8 @@ def get_comprehensive_data(code):
                 "p": price, "roe": roe, "eps": eps, "gp": gp_m, "op": op_m, "debt": debt_e,
                 "fcf": fcf, "div": div_y, "rev": rev_g, "pe_b": pe_b, "intrinsic": intrinsic, 
                 "safety": safety, "pos_52": pos_52, "df": df, "stoch": stoch, "macd": macd, 
-                "bol": bol, "name": name_map.get(code, code), "industry": ind
+                "bol": bol, "name": name_map.get(code, code), "industry": ind,
+                "target_mean": intrinsic  # <--- 補上這行，讓 AI 有數據可以讀
             }
         except: continue
     return None
@@ -120,7 +121,7 @@ def get_ai_analysis_report(d, code, api_key):
 3. 📉【股價走勢與動能判斷】：
    目前的 K線、KD、MACD、RSI 透露什麼買賣訊號？目前股價是反應基本面價值，還是處於市場情緒的過度波動？分析大戶及法人買賣趨勢。
 4. 🎯【法人目標價與達成時間預估】：
-   分析法人平均目標價 {d['target_mean'] if d['target_mean'] else 'N/A'} 的合理性。預估股價達到合理價的預測時間，並說明預測理由。
+   分析法人平均目標價 {round(d['intrinsic'], 1) if d['intrinsic'] else 'N/A'} 的合理性。預估股價達到合理價的預測時間，並說明預測理由。
 5. 📈【終極投資策略建議】：
    給出具體的「長線持有」或「短線避險」建議。請提供長線及短線進場股價及停損點股價。"""
 
@@ -207,6 +208,7 @@ if code_input:
 
     else:
         st.error("❌ 抓不到數據，請確認代碼是否正確。")
+
 
 
 
