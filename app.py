@@ -299,44 +299,68 @@ code_input = st.sidebar.text_input("🔍 輸入台股代碼", placeholder="2330"
 # 這一段 CSS 要貼在這裡，UI 開始之後、任何 st.header 之前
 st.markdown("""
 <style>
-/* 1. 大標題：一、基本面、二、技術面、三、財務、四、現金流、五、AI診斷 */
-/* 你用的是 st.header，會是 h1 */
-h1 { 
-    color: red !important; 
-    margin-bottom: 0.5rem !important; 
+/* 1. 股票名稱大標題（用 st.title，會是 h1） */
+h1 {
+    color: #34495E !important;              /* 深灰 */
+    font-size: 1.9rem !important;           /* 稍大一點 */
+    font-weight: 600 !important;
+    margin-bottom: 0.4rem !important;       /* 下方間距 */
+    margin-top: 0.1rem !important;          /* 上方間距 */
+    padding-top: 0.1rem !important;
+    padding-bottom: 0.1rem !important;
+    letter-spacing: -0.02em !important;     /* 字距稍微縮緊 */
 }
 
-/* 2. 小標題：盈利能力、成長性、財務結構、現金流品質、估值水準、趨勢與均線、動能與強度、波動與區間、成交量與量價關係 */
-/* 你用的是 st.subheader，會是 h2 */
-h2 { 
-    color: #6A53D4 !important;
-    margin: 0.2rem 0 0.3rem 0 !important;
+/* 2. 一、基本面、二、技術面、三、財務、四、現金流、五、AI診斷（用 st.header，會是 h2） */
+h2 {
+    color: #0095FF !important;              /* 藍色 */
+    font-size: 1.7rem !important;
+    font-weight: 600 !important;
+    margin-top: 0.7rem !important;          /* 這一區塊往上多一點空 */
+    margin-bottom: 0.3rem !important;       /* 下方空不要太大 */
+    padding-top: 0.2rem !important;
+    padding-bottom: 0.2rem !important;
 }
 
-h3 { 
-    color: #2ECC71 !important;
-    margin: 0.2rem 0 0.3rem 0 !important;
+/* 3. 盈利能力、成長性、財務結構、現金流品質、估值水準（用 st.subheader，會是 h3） */
+h3 {
+    color: #E67E22 !important;              /* 橘色 */
+    font-size: 1.35rem !important;
+    font-weight: 500 !important;
+    margin-top: 0.5rem !important;          /* 小區塊上緣空一點 */
+    margin-bottom: 0.2rem !important;       /* 下緣緊一點 */
+    padding-top: 0.1rem !important;
+    padding-bottom: 0.1rem !important;
+    border-left: 4px solid #E67E22 !important;  /* 左側一條細色條，視覺上突顯 */
+    padding-left: 0.5rem !important;
 }
-/* 3. 小數據（metrics 的數字與標籤、你用的 col1/col2 內容） */
+
+/* 4. 小數據（metrics 的數字與標籤、你用的 col1/col2 內容） */
 /* 所有 metric 的數字（例如：9.8%、0.5% 這類） */
 .metric-value {
     color: #2ECC71 !important;          /* 綠色，可改為 #E74C3C（紅）、#F39C12（橙） */
-    font-size: 1.5rem !important;
+    font-size: 1.6rem !important;       /* 稍大一點，更明顯 */
+    font-weight: 600 !important;
+    margin-bottom: 0.1rem !important;   /* 數字與標籤之間的空 */
+    line-height: 1.2 !important;
 }
 
 /* 所有 metric 的標籤（例如：毛利率、淨利率、EPS） */
 .metric-label {
     color: #555555 !important;          /* 深灰，可改為 #888（更淺灰）、#0066ff（藍） */
     font-size: 0.8rem !important;
+    font-weight: 500 !important;
+    margin-top: 0.1rem !important;      /* 標籤與上面內容的空 */
+    line-height: 1.3 !important;
 }
 
 /* 一般段落文字（例如：你用的 st.write / st.markdown 說明文字） */
 .element-container p {
     color: #333333 !important;          /* 深黑，可改成 #444444 */
     font-size: 0.95rem !important;
-    margin: 0.2rem 0 !important;
+    line-height: 1.4 !important;
+    margin: 0.2rem 0 !important;        /* 每個段落上下的空 */
 }
-
 
 /* 4. 你原本的「壓緊 header 間距」設定，保留在這，不會影響顏色 */
 .st-emotion-cache-gi0tri {
@@ -346,6 +370,7 @@ h3 {
     padding-bottom: 0.05rem !important;
     line-height: 1.1 !important;
 }
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -576,6 +601,7 @@ if code_input:
                 st.error("🔧 請先在 Streamlit Cloud 設定 Secrets：App Settings → Secrets → GEMINI_API_KEY")
     else:
         st.write("✅ 這是 Ray 的最新台股深度分析版本")
+
 
 
 
