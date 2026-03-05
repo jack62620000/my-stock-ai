@@ -302,7 +302,7 @@ st.markdown("""
 /* 1. 大標題：一、基本面、二、技術面、三、財務、四、現金流、五、AI診斷 */
 /* 你用的是 st.header，會是 h1 */
 h1 { 
-    color: #E74C3C !important; 
+    color: red !important; 
     margin-bottom: 0.5rem !important; 
 }
 
@@ -571,6 +571,7 @@ if code_input:
                 st.error("🔧 請先在 Streamlit Cloud 設定 Secrets：App Settings → Secrets → GEMINI_API_KEY")
     else:
         st.write("✅ 這是 Ray 的最新台股深度分析版本")
+
 
 
 
