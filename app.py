@@ -5,8 +5,6 @@ import pandas_ta as ta
 import google.generativeai as genai
 import numpy as np
 
-st.set_page_config(page_title="台股深度分析", layout="wide")
-
 # --- 1. 股票名稱抓取 ---
 @st.cache_data(ttl=86400)
 def get_all_names():
@@ -585,6 +583,7 @@ if code_input:
                 st.error("🔧 請先在 Streamlit Cloud 設定 Secrets：App Settings → Secrets → GEMINI_API_KEY")
     else:
         st.error("❌ 請確認輸入正確的股票代碼（例如 2330、2317）")
+
 
 
 
