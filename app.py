@@ -338,25 +338,6 @@ if code_input:
     if d:
         st.title(f"📊 {d.get('name', code_input)} ({code_input})")
 
-        st.markdown(
-    """
-    <style>
-    /* 縮小 subheader 與下方 metrics 的間距 */
-    .stSubheader { 
-        margin-bottom: 0.1rem;
-    }
-    /* 縮小 metric 之間的行距 */
-    .stMetric, .stMetricLabel, .stMetricValue {
-        margin: 0.1rem 0 0.1rem 0;
-    }
-    /* 整個基本面區塊整體不要太寬 */
-    div[data-testid="stContainer"] {
-        padding-top: 0.2rem;
-        padding-bottom: 0.2rem;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
         #  ========== 一、基本面（公司賺不賺錢）==========
         st.header("📌 一、基本面：公司賺不賺錢")
         with st.container(border=True):
@@ -523,6 +504,7 @@ if code_input:
                 st.error("🔧 請先在 Streamlit Cloud 設定 Secrets：App Settings → Secrets → GEMINI_API_KEY")
     else:
         st.error("❌ 請確認輸入正確的股票代碼（例如 2330、2317）")
+
 
 
 
