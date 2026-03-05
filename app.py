@@ -299,27 +299,19 @@ code_input = st.sidebar.text_input("🔍 輸入台股代碼", placeholder="2330"
 # 這一段 CSS 要貼在這裡，UI 開始之後、任何 st.header 之前
 st.markdown("""
 <style>
-/* 1. 大標題：📌 一、基本面、📉 二、技術面、🏦 三、財務與資本結構、💵 四、現金流與股利、🤖 五、AI診斷 */
-/* 你只需要把 .st-emotion-cache-gi0tri 換成你 inspect 出來的 header class，如果二、三、四、五不同也要補上 */
-.st-emotion-cache-gi0tri {
-    color: #0095FF !important;          /* 藍色，可改成 #E74C3C（紅）、#27AE60（綠）等 */
+/* 1. 大標題：一、基本面、二、技術面、三、財務、四、現金流、五、AI診斷 */
+/* 你用的是 st.header，會是 h1 */
+h1.st-emotion-cache-gi0tri {
+    color: #0095FF !important;
     font-size: 1.8rem !important;
-    margin-bottom: 0.05rem !important;
-    margin-top: 0.1rem !important;
-    padding-top: 0.05rem !important;
-    padding-bottom: 0.05rem !important;
-    line-height: 1.1 !important;
 }
 
 /* 2. 小標題：盈利能力、成長性、財務結構、現金流品質、估值水準、趨勢與均線、動能與強度、波動與區間、成交量與量價關係 */
-/* 這些都是 st.subheader，會變成 h2 */
-h2 {
-    color: red !important;          /* 橘色，可改為 #27AE60（綠）、#34495E（深灰） */
+/* 你用的是 st.subheader，會是 h2 */
+h2.st-emotion-cache-gi0tri {
+    color: red !important;
     font-size: 1.4rem !important;
-    margin-top: 0.5rem !important;
-    margin-bottom: 0.2rem !important;
 }
-
 /* 你也可以單獨指定某一項 subheader（例如：盈利能力）用不同顏色 */
 /* 用 inspect 去抓「盈利能力」那一行的 class，下面這個只是範例 */
 .st-emotion-cache-AAAAAA {
@@ -587,6 +579,7 @@ if code_input:
                 st.error("🔧 請先在 Streamlit Cloud 設定 Secrets：App Settings → Secrets → GEMINI_API_KEY")
     else:
         st.write("✅ 這是 Ray 的最新台股深度分析版本")
+
 
 
 
