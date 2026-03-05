@@ -343,6 +343,51 @@ def get_ai_analysis_report(d, code, api_key):
 # --- 4. UI 主畫面 ---
 code_input = st.sidebar.text_input("🔍 輸入台股代碼", placeholder="2330").strip().upper()
 
+# 這一段 CSS 要貼在這裡，UI 開始之後、任何 st.header 之前
+st.markdown("""
+<style>
+/* 重點先壓縮 header 本身的間距 */
+.stHeader {
+    margin-bottom: 0.1rem !important;
+}
+
+/* 標題 */
+h1 { 
+    font-size: 1.8rem !important; 
+    margin-bottom: 0.5rem !important; 
+}
+h2, h3 { 
+    font-size: 1.6rem !important; 
+    margin: 0.2rem 0 0.3rem 0 !important; 
+}
+
+/* metric 區 */
+.metric-container { 
+    font-size: 1rem !important; 
+    margin-bottom: 0.1rem !important; 
+}
+.metric-value { 
+    font-size: 1.5rem !important; 
+}
+.metric-label { 
+    font-size: 0.8rem !important; 
+}
+
+/* 一般文字統一 */
+div[data-testid="column"] p, div[data-testid="column"] div {
+    font-size: 0.95rem !important;
+    line-height: 1.3 !important;
+}
+
+/* 解決 st.write 大小 */
+.element-container p {
+    font-size: 0.95rem !important;
+    margin: 0.2rem 0 !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
+st.set_page_config(page_title="台股深度分析", layout="wide")
 if code_input:
     with st.spinner(f"🔄 分析 {code_input} 資料中..."):
         d = get_deep_analysis_data(code_input)
@@ -585,6 +630,7 @@ if code_input:
                 st.error("🔧 請先在 Streamlit Cloud 設定 Secrets：App Settings → Secrets → GEMINI_API_KEY")
     else:
         st.error("❌ 請確認輸入正確的股票代碼（例如 2330、2317）")
+
 
 
 
