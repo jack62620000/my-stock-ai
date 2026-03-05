@@ -137,7 +137,14 @@ def get_deep_analysis_data(code):
             df["ma60"] = ta.sma(df["Close"], 60)
             df["偏差"] = (df["Close"] - df["ma20"]) / df["ma20"]
             df["rsi"] = ta.rsi(df["Close"], 14)
-            df["macd"], df["macd_signal"], _ = ta.macd(df["Close"])
+            # 技術面指標：MACD 安全寫法
+macd_df = ta.macd(df["Close"])
+if isinstance(macd_df, pd.DataFrame) and not macd_df.empty:
+    df["macd"] = macd_df.iloc[:, 0]          # 通常第一欄是 MACD line
+    df["macd_signal"] = macd_df.iloc[:, 1]   # 第二欄是 Signal line
+else:
+    df["macd"] = np.nan
+    df["macd_signal"] = np.nan
             df["布林上"], df["布林中"], df["布林下"] = ta.bbands(df["Close"]).iloc[:, 0], ta.bbands(df["Close"]).iloc[:, 1], ta.bbands(df["Close"]).iloc[:, 2]
             df["52高"] = df["High"].max()
             df["52低"] = df["Low"].min()
@@ -314,8 +321,11 @@ if code_input:
                 # 動能與強度
                 t2.subheader("動能與強度")
                 t2.write(f"RSI: {d.get('rsi', 50):.1f}")
-                t2.write(f"MACD 本體: {latest['macd'] if 'macd' in latest else 0:+.2f}")
-                t2.write(f"MACD 信號線: {latest['macd_signal'] if 'macd_signal' in latest else 0:+.2f}")
+                macd_line = df["macd"].iloc[-1] if "macd" in df.columns else 0.0
+macd_signal = df["macd_signal"].iloc[-1] if "macd_signal" in df.columns else 0.0
+
+t2.write(f"MACD 本體: {macd_line:+.2f}")
+t2.write(f"MACD 信號線: {macd_signal:+.2f}")
 
                 # 波動與區間
                 t3.subheader("波動與區間")
@@ -387,4 +397,5 @@ if code_input:
                 st.error("🔧 請先在 Streamlit Cloud 設定 Secrets：App Settings → Secrets → GEMINI_API_KEY")
     else:
         st.error("❌ 請確認輸入正確的股票代碼（例如 2330、2317）")
+
 
