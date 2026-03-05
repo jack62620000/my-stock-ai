@@ -9,19 +9,19 @@ import numpy as np
 st.markdown("""
 <style>
 /* 標題 */
-h1 { font-size: 2.2rem !important; margin-bottom: 1rem !important; }
-h2, h3 { font-size: 1.6rem !important; margin: 0.3rem 0 0.5rem 0 !important; }
+h1 { font-size: 1.8rem !important; margin-bottom: 0.5rem !important; }
+h2, h3 { font-size: 1.6rem !important; margin: 0.2rem 0 0.3rem 0.3 !important; }
 
 /* 容器內文字統一 */
 .metric-container { 
-    font-size: 1.0rem !important; 
-    margin-bottom: 0.3rem !important; 
+    font-size: 1.2rem !important; 
+    margin-bottom: 0.1rem !important; 
 }
 .metric-value { 
-    font-size: 1.4rem !important; 
+    font-size: 1.5rem !important; 
 }
 .metric-label { 
-    font-size: 0.85rem !important; 
+    font-size: 0.8rem !important; 
 }
 
 /* 一般文字統一 */
@@ -573,6 +573,7 @@ if code_input:
                 st.error("🔧 請先在 Streamlit Cloud 設定 Secrets：App Settings → Secrets → GEMINI_API_KEY")
     else:
         st.error("❌ 請確認輸入正確的股票代碼（例如 2330、2317）")
+
 
 
 
