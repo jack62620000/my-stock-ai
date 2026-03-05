@@ -343,7 +343,7 @@ if code_input:
             <style>
             /* 縮小 subheader 與 metrics 的間距 */
             .stSubheader {
-                 margin-bottom: 0rem;
+                 margin-bottom: 0.1rem;
             }
             /* 讓 metrics 之間緊一點 */
             .stMetric, .stMetricLabel, .stMetricValue {
@@ -519,6 +519,7 @@ if code_input:
                 st.error("🔧 請先在 Streamlit Cloud 設定 Secrets：App Settings → Secrets → GEMINI_API_KEY")
     else:
         st.error("❌ 請確認輸入正確的股票代碼（例如 2330、2317）")
+
 
 
 
