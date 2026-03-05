@@ -508,46 +508,254 @@ if code_input:
             # 成長性
             st.subheader("成長性")
             g1, g2, g3, g4, g5, g6, g7 = st.columns(7)
-            g1.metric("營收成長率：", f"{d.get('rev_growth', 0) * 100:.1f}%")
-            g2.metric("EPS 成長率：", f"{d.get('eps_growth', 0) * 100:.1f}%")
-            g3.metric("淨利成長率：", f"{d.get('net_income_growth', 0) * 100:.1f}%")
-            g4.metric("毛利成長率：", f"{d.get('gross_profit_growth', 0) * 100:.1f}%")
-            g5.metric("營業利益成長率：", f"{d.get('operating_income_growth', 0) * 100:.1f}%")
-            g6.metric("資產成長率：", f"{d.get('assets_growth', 0) * 100:.1f}%")
-            g7.metric("權益成長率：", f"{d.get('equity_growth', 0) * 100:.1f}%")
+            # 營收成長率
+            rev_growth = d.get("rev_growth", 0) * 100
+            if rev_growth > 10:
+                rev_text = "偏高"
+            elif rev_growth >= 0:
+                rev_text = "合理"
+            else:
+                rev_text = "偏低"
+            g1.metric("營收成長率：", f"{rev_growth:.1f}% ({rev_text})")
+            # EPS 成長率
+            eps_growth = d.get("eps_growth", 0) * 100
+            if eps_growth > 10:
+                eps_growth_text = "偏高"
+            elif eps_growth >= 0:
+                eps_growth_text = "合理"
+            else:
+                eps_growth_text = "偏低"
+            g2.metric("EPS 成長率：", f"{eps_growth:.1f}% ({eps_growth_text})")
+            # 淨利成長率
+            net_income_growth = d.get("net_income_growth", 0) * 100
+            if net_income_growth > 10:
+                net_income_text = "偏高"
+            elif net_income_growth >= 0:
+                net_income_text = "合理"
+            else:
+                net_income_text = "偏低"
+            g3.metric("淨利成長率：", f"{net_income_growth:.1f}% ({net_income_text})")
+            # 毛利成長率
+            gross_profit_growth = d.get("gross_profit_growth", 0) * 100
+            if gross_profit_growth > 10:
+                gross_profit_text = "偏高"
+            elif gross_profit_growth >= 0:
+                gross_profit_text = "合理"
+            else:
+                gross_profit_text = "偏低"
+            g4.metric("毛利成長率：", f"{gross_profit_growth:.1f}% ({gross_profit_text})")
+            # 營業利益成長率
+            op_income_growth = d.get("operating_income_growth", 0) * 100
+            if op_income_growth > 10:
+                op_income_text = "偏高"
+            elif op_income_growth >= 0:
+                op_income_text = "合理"
+            else:
+                op_income_text = "偏低"
+            g5.metric("營業利益成長率：", f"{op_income_growth:.1f}% ({op_income_text})")
+            # 資產成長率
+            assets_growth = d.get("assets_growth", 0) * 100
+            if assets_growth > 5:
+                assets_text = "偏高"
+            elif assets_growth >= 0:
+                assets_text = "合理"
+            else:
+                assets_text = "偏低"
+            g6.metric("資產成長率：", f"{assets_growth:.1f}% ({assets_text})")
+            # 權益成長率
+            equity_growth = d.get("equity_growth", 0) * 100
+            if equity_growth > 8:
+                equity_text = "偏高"
+            elif equity_growth >= 0:
+                equity_text = "合理"
+            else:
+                equity_text = "偏低"
+            g7.metric("權益成長率：", f"{equity_growth:.1f}% ({equity_text})")
 
             # 財務結構
             st.subheader("財務結構")
             f1, f2, f3, f4, f5, f6, f7 = st.columns(7)
-            f1.metric("負債比率：", f"{d.get('debt_ratio', 0) * 100:.1f}%")
-            f2.metric("負債／股東權益：", f"{d.get('debt_to_equity', 0) * 100:.1f}%")
-            f3.metric("流動比率：", f"{d.get('current_ratio', 0):.2f}")
-            f4.metric("速動比率：", f"{d.get('quick_ratio', 0):.2f}")
-            f5.metric("存貨佔資產比：", f"{d.get('inv_asset_ratio', 0):.1%}")
-            f6.metric("現金佔資產比：", f"{d.get('cash_asset_ratio', 0):.1%}")
-            f7.metric("非流動負債占負債比：", f"{d.get('ncd_liabilities_ratio', 0):.1%}")
+            # 負債比率
+            debt_ratio = d.get("debt_ratio", 0) * 100
+            if debt_ratio < 50:
+                debt_text = "偏低"
+            elif debt_ratio <= 70:
+                debt_text = "合理"
+            else:
+                debt_text = "偏高"
+            f1.metric("負債比率：", f"{debt_ratio:.1f}% ({debt_text})")
+            # 負債／股東權益
+            debt_to_equity = d.get("debt_to_equity", 0) * 100
+            if debt_to_equity < 50:
+                dte_text = "偏低"
+            elif debt_to_equity <= 100:
+                dte_text = "合理"
+            else:
+                dte_text = "偏高"
+            f2.metric("負債／股東權益：", f"{debt_to_equity:.1f}% ({dte_text})")
+            # 流動比率
+            current_ratio = d.get("current_ratio", 0)
+            if current_ratio > 1.5:
+                current_text = "偏高"
+            elif current_ratio >= 1:
+                current_text = "合理"
+            else:
+                current_text = "偏低"
+            f3.metric("流動比率：", f"{current_ratio:.2f} ({current_text})")
+            # 速動比率
+            quick_ratio = d.get("quick_ratio", 0)
+            if quick_ratio > 1.2:
+                quick_text = "偏高"
+            elif quick_ratio >= 0.7:
+                quick_text = "合理"
+            else:
+                quick_text = "偏低"
+            f4.metric("速動比率：", f"{quick_ratio:.2f} ({quick_text})")
+            # 存貨佔資產比
+            inv_asset_ratio = d.get("inv_asset_ratio", 0)
+            if inv_asset_ratio < 0.2:
+                inv_text = "偏低"
+            elif inv_asset_ratio <= 0.5:
+                inv_text = "合理"
+            else:
+                inv_text = "偏高"
+            f5.metric("存貨佔資產比：", f"{inv_asset_ratio:.1%} ({inv_text})")
+            # 現金佔資產比
+            cash_asset_ratio = d.get("cash_asset_ratio", 0)
+            if cash_asset_ratio > 0.1:
+                cash_text = "偏高"
+            elif cash_asset_ratio >= 0.05:
+                cash_text = "合理"
+            else:
+                cash_text = "偏低"
+            f6.metric("現金佔資產比：", f"{cash_asset_ratio:.1%} ({cash_text})")
+            # 非流動負債占負債比
+            ncd_liabilities_ratio = d.get("ncd_liabilities_ratio", 0)
+            if ncd_liabilities_ratio < 0.5:
+                ncd_text = "偏低"
+            elif ncd_liabilities_ratio <= 0.8:
+                ncd_text = "合理"
+            else:
+                ncd_text = "偏高"
+            f7.metric("非流動負債占負債比：", f"{ncd_liabilities_ratio:.1%} ({ncd_text})")
 
             # 現金流品質
             st.subheader("現金流品質")
             ca1, ca2, ca3, ca4, ca5, ca6, ca7 = st.columns(7)
             ca1.metric("營業現金流：", f"{d.get('operating_cashflow', 0) / 1e8:.1f}億")
             ca2.metric("自由現金流(FCF)：", f"{d.get('free_cashflow', 0) / 1e8:.1f}億")
-            ca3.metric("現金流/淨利：", f"{d.get('cashflow_profit_ratio', 0):.2f}")
-            ca4.metric("FCF/營收：", f"{d.get('fcf_revenue_ratio', 0):.1%}")
-            ca5.metric("FCF/股價：", f"{d.get('fcf_price_ratio', 0):.1%}")
-            ca6.metric("FCF 成長率：", f"{d.get('fcf_growth', 0) * 100:.1f}%")
-            ca7.metric("資本支出／營業現金流：", f"{d.get('capex_to_cashflow', 0):.2f}")
+            # 現金流／淨利
+            cashflow_profit_ratio = d.get("cashflow_profit_ratio", 0)
+            if cashflow_profit_ratio > 1:
+                cfp_text = "偏高"
+            elif cashflow_profit_ratio >= 0.7:
+                cfp_text = "合理"
+            else:
+                cfp_text = "偏低"
+            ca3.metric("現金流/淨利：", f"{cashflow_profit_ratio:.2f} ({cfp_text})")
+            # FCF/營收
+            fcf_revenue_ratio = d.get("fcf_revenue_ratio", 0)
+            if fcf_revenue_ratio > 0.15:
+                fcf_rev_text = "偏高"
+            elif fcf_revenue_ratio >= 0.05:
+                fcf_rev_text = "合理"
+            else:
+                fcf_rev_text = "偏低"
+            ca4.metric("FCF/營收：", f"{fcf_revenue_ratio:.1%} ({fcf_rev_text})")
+            # FCF/股價
+            fcf_price_ratio = d.get("fcf_price_ratio", 0)
+            if fcf_price_ratio > 0.05:
+                fcf_price_text = "偏高"
+            elif fcf_price_ratio >= 0.01:
+                fcf_price_text = "合理"
+            else:
+                fcf_price_text = "偏低"
+            ca5.metric("FCF/股價：", f"{fcf_price_ratio:.1%} ({fcf_price_text})")
+            # FCF 成長率
+            fcf_growth = d.get("fcf_growth", 0) * 100
+            if fcf_growth > 10:
+                fcf_growth_text = "偏高"
+            elif fcf_growth >= 0:
+                fcf_growth_text = "合理"
+            else:
+                fcf_growth_text = "偏低"
+            ca6.metric("FCF 成長率：", f"{fcf_growth:.1f}% ({fcf_growth_text})")
+            # 資本支出／營業現金流
+            capex_to_cashflow = d.get("capex_to_cashflow", 0)
+            if capex_to_cashflow > 1.0:
+                capex_cf_text = "偏高"
+            elif capex_to_cashflow >= 0.5:
+                capex_cf_text = "合理"
+            else:
+                capex_cf_text = "偏低"
+            ca7.metric("資本支出／營業現金流：", f"{capex_to_cashflow:.2f} ({capex_cf_text})")
 
             # 估值水準
             st.subheader("估值水準")
             v1, v2, v3, v4, v5, v6, v7 = st.columns(7)
-            v1.metric("本益比(P/E)：", f"{d.get('pe', 0):.1f}x")
-            v2.metric("股價淨值比(P/B)：", f"{d.get('pb', 0):.1f}x")
-            v3.metric("PEG：", f"{d.get('peg', 0):.1f}")
-            v4.metric("股利殖利率：", f"{d.get('dividend_yield', 0) * 100:.1f}%")
-            v5.metric("盈餘配發率：", f"{d.get('payout_ratio', 0) * 100:.1f}%")
-            v6.metric("現金股利報酬率：", f"{d.get('cash_dividend_yield', 0) * 100:.1f}%")
-            v7.metric("帳面價值成長率：", f"{d.get('book_value_growth', 0) * 100:.1f}%")
+            # 本益比(P/E)
+            pe = d.get("pe", 0)
+            if pe < 10:
+                pe_text = "偏低"
+            elif pe <= 20:
+                pe_text = "合理"
+            else:
+                pe_text = "偏高"
+            v1.metric("本益比(P/E)：", f"{pe:.1f}x ({pe_text})")
+            # 股價淨值比(P/B)
+            pb = d.get("pb", 0)
+            if pb < 1:
+                pb_text = "偏低"
+            elif pb <= 2:
+                pb_text = "合理"
+            else:
+                pb_text = "偏高"
+            v2.metric("股價淨值比(P/B)：", f"{pb:.1f}x ({pb_text})")
+            # PEG
+            peg = d.get("peg", 0)
+            if peg < 0.5:
+                peg_text = "偏低"
+            elif peg <= 1.0:
+                peg_text = "合理"
+            else:
+                peg_text = "偏高"
+            v3.metric("PEG：", f"{peg:.1f} ({peg_text})")
+            # 股利殖利率
+            div_yield = d.get("dividend_yield", 0) * 100
+            if div_yield > 5:
+                div_text = "偏高"
+            elif div_yield >= 2:
+                div_text = "合理"
+            else:
+                div_text = "偏低"
+            v4.metric("股利殖利率：", f"{div_yield:.1f}% ({div_text})")
+            # 盈餘配發率
+            payout_ratio = d.get("payout_ratio", 0) * 100
+            if payout_ratio > 70:
+                payout_text = "偏高"
+            elif payout_ratio >= 30:
+                payout_text = "合理"
+            else:
+                payout_text = "偏低"
+            v5.metric("盈餘配發率：", f"{payout_ratio:.1f}% ({payout_text})")
+            # 現金股利報酬率
+            cash_dividend_yield = d.get("cash_dividend_yield", 0) * 100
+            if cash_dividend_yield > 5:
+                cd_text = "偏高"
+            elif cash_dividend_yield >= 2:
+                cd_text = "合理"
+            else:
+                cd_text = "偏低"
+            v6.metric("現金股利報酬率：", f"{cash_dividend_yield:.1f}% ({cd_text})")
+            # 帳面價值成長率
+            book_value_growth = d.get("book_value_growth", 0) * 100
+            if book_value_growth > 8:
+                bv_text = "偏高"
+            elif book_value_growth >= 0:
+                bv_text = "合理"
+            else:
+                bv_text = "偏低"
+            v7.metric("帳面價值成長率：", f"{book_value_growth:.1f}% ({bv_text})")
             
 
         #  ========== 二、技術面（趨勢、動能、波動、量價）==========
@@ -562,10 +770,36 @@ if code_input:
 
                 # 趨勢與均線
                 t1.subheader("趨勢與均線")
-                t1.write(f"MA5： {latest.get('ma5', price):.1f}")
-                t1.write(f"MA20： {latest.get('ma20', price):.1f}")
-                t1.write(f"MA60： {latest.get('ma60', price):.1f}")
-                t1.write(f"乖離率： {d.get('bias', 0):.1f}%")
+                price = d.get("price", price)
+                # MA5
+                ma5 = latest.get("ma5", price)
+                if price > ma5:
+                    ma5_text = "多頭"
+                else:
+                    ma5_text = "空頭"
+                t1.write(f"MA5： {ma5:.1f} ({ma5_text})")
+                # MA20
+                ma20 = latest.get("ma20", price)
+                if price > ma20:
+                    ma20_text = "多頭"
+                else:
+                    ma20_text = "空頭"
+                t1.write(f"MA20： {ma20:.1f} ({ma20_text})")
+                # MA60
+                ma60 = latest.get("ma60", price)
+                if price > ma60:
+                    ma60_text = "多頭"
+                else:
+                    ma60_text = "空頭"
+                t1.write(f"MA60： {ma60:.1f} ({ma60_text})")
+                bias = d.get("bias", 0)
+                if bias > 5:
+                    bias_text = "偏高"
+                elif bias < -5:
+                    bias_text = "偏低"
+                else:
+                    bias_text = "合理"
+                t1.write(f"乖離率： {bias:.1f}% ({bias_text})")
 
                 # 動能與強度
                 t2.subheader("動能與強度")
@@ -657,6 +891,7 @@ if code_input:
                 st.error("🔧 請先在 Streamlit Cloud 設定 Secrets：App Settings → Secrets → GEMINI_API_KEY")
     else:
         st.write("✅ 這是 Ray 的最新台股深度分析版本")
+
 
 
 
