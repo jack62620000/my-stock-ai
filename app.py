@@ -366,7 +366,7 @@ if code_input:
             c5.metric("ROE", f"{d.get('roe', 0) * 100:.1f}%")
             c6.metric("ROA", f"{d.get('roa', 0) * 100:.1f}%")
             c7.metric("EPS 成長率", f"{d.get('eps_growth', 0) * 100:.1f}%")
-            st.markdown("#", unsafe_allow_html=True)       
+     
             # 成長性
             st.subheader("成長性")
             g1, g2, g3, g4, g5, g6, g7 = st.columns(7)
@@ -519,6 +519,7 @@ if code_input:
                 st.error("🔧 請先在 Streamlit Cloud 設定 Secrets：App Settings → Secrets → GEMINI_API_KEY")
     else:
         st.error("❌ 請確認輸入正確的股票代碼（例如 2330、2317）")
+
 
 
 
