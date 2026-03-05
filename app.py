@@ -138,18 +138,18 @@ def get_deep_analysis_data(code):
             df["偏差"] = (df["Close"] - df["ma20"]) / df["ma20"]
             df["rsi"] = ta.rsi(df["Close"], 14)
             # 技術面指標：MACD 安全寫法
-try:
-    macd_df = ta.macd(df["Close"])
-    if isinstance(macd_df, pd.DataFrame) and not macd_df.empty:
-        df["macd"] = macd_df.iloc[:, 0]          # MACD line
-        df["macd_signal"] = macd_df.iloc[:, 1]   # Signal line
-    else:
-        df["macd"] = np.nan
-        df["macd_signal"] = np.nan
-except Exception as e:
-    # 計算失敗，給預設值即可
-    df["macd"] = np.nan
-    df["macd_signal"] = np.nan
+            try:
+                 macd_df = ta.macd(df["Close"])
+                 if isinstance(macd_df, pd.DataFrame) and not macd_df.empty:
+                    df["macd"] = macd_df.iloc[:, 0]          # MACD line
+                    df["macd_signal"] = macd_df.iloc[:, 1]   # Signal line
+                else:
+                    df["macd"] = np.nan
+                    df["macd_signal"] = np.nan
+            except Exception as e:
+                # 計算失敗，給預設值即可
+                df["macd"] = np.nan
+                df["macd_signal"] = np.nan
             df["布林上"], df["布林中"], df["布林下"] = ta.bbands(df["Close"]).iloc[:, 0], ta.bbands(df["Close"]).iloc[:, 1], ta.bbands(df["Close"]).iloc[:, 2]
             df["52高"] = df["High"].max()
             df["52低"] = df["Low"].min()
@@ -403,6 +403,7 @@ t2.write(f"MACD 信號線: {macd_signal:+.2f}")
                 st.error("🔧 請先在 Streamlit Cloud 設定 Secrets：App Settings → Secrets → GEMINI_API_KEY")
     else:
         st.error("❌ 請確認輸入正確的股票代碼（例如 2330、2317）")
+
 
 
 
