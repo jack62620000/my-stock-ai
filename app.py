@@ -441,13 +441,69 @@ if code_input:
             # 盈利能力
             st.subheader("盈利能力")
             c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
-            c1.metric("毛利率：", f"{d.get('gross_profit', 0) * 100:.1f}%")
-            c2.metric("淨利率：", f"{d.get('net_margin', 0) * 100:.1f}%")
-            c3.metric("營業利益率：", f"{d.get('op_margin', 0) * 100:.1f}%")
-            c4.metric("EPS：", f"{d.get('eps', 0):.2f}")
-            c5.metric("ROE：", f"{d.get('roe', 0) * 100:.1f}%")
-            c6.metric("ROA：", f"{d.get('roa', 0) * 100:.1f}%")
-            c7.metric("EPS 成長率：", f"{d.get('eps_growth', 0) * 100:.1f}%")
+            # 毛利率
+            gp = d.get("gross_profit", 0) * 100
+            if gp > 30:
+                gp_text = "偏高"
+            elif gp >= 20:
+                gp_text = "合理"
+            else:
+                gp_text = "偏低"
+            c1.metric("毛利率：", f"{gp:.1f}% ({gp_text})")
+            # 淨利率
+            nm = d.get("net_margin", 0) * 100
+            if nm > 8:
+                nm_text = "偏高"
+            elif nm >= 4:
+                nm_text = "合理"
+            else:
+                nm_text = "偏低"
+            c2.metric("淨利率：", f"{nm:.1f}% ({nm_text})")
+            # 營業利益率
+            om = d.get("op_margin", 0) * 100
+            if om > 10:
+                om_text = "偏高"
+            elif om >= 5:
+                om_text = "合理"
+            else:
+                om_text = "偏低"
+            c3.metric("營業利益率：", f"{om:.1f}% ({om_text})")
+            # EPS
+            eps = d.get("eps", 0)
+            if eps > 3:
+                eps_text = "偏高"
+            elif eps >= 1.5:
+                eps_text = "合理"
+            else:
+                eps_text = "偏低"
+            c4.metric("EPS：", f"{eps:.2f} ({eps_text})")
+            # ROE
+            roe = d.get("roe", 0) * 100
+            if roe > 15:
+                roe_text = "偏高"
+            elif roe >= 10:
+                roe_text = "合理"
+            else:
+                roe_text = "偏低"
+            c5.metric("ROE：", f"{roe:.1f}% ({roe_text})")
+            # ROA
+            roa = d.get("roa", 0) * 100
+            if roa > 8:
+                roa_text = "偏高"
+            elif roa >= 4:
+                roa_text = "合理"
+            else:
+                roa_text = "偏低"
+            c6.metric("ROA：", f"{roa:.1f}% ({roa_text})")
+            # EPS 成長率
+            eps_growth = d.get("eps_growth", 0) * 100
+            if eps_growth > 10:
+                eps_growth_text = "偏高"
+            elif eps_growth >= 0:
+                eps_growth_text = "合理"
+            else:
+                eps_growth_text = "偏低"
+            c7.metric("EPS 成長率：", f"{eps_growth:.1f}% ({eps_growth_text})")
      
             # 成長性
             st.subheader("成長性")
@@ -601,6 +657,7 @@ if code_input:
                 st.error("🔧 請先在 Streamlit Cloud 設定 Secrets：App Settings → Secrets → GEMINI_API_KEY")
     else:
         st.write("✅ 這是 Ray 的最新台股深度分析版本")
+
 
 
 
