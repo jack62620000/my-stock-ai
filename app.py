@@ -273,36 +273,51 @@ if code_input:
             c4.metric("EPS", f"{d.get('eps', 0):.2f}")
             c5.metric("ROE", f"{d.get('roe', 0) * 100:.1f}%")
             c6.metric("ROA", f"{d.get('roa', 0) * 100:.1f}%")
-
+            c7.metric("EPS 成長率", f"{d.get('eps_growth', 0) * 100:.1f}%")
+        
             # 成長性
             st.subheader("成長性")
-            g1, g2, g3 = st.columns(3)
+            g1, g2, g3, g4, g5, g6, g7 = st.columns(7)
             g1.metric("營收成長率", f"{d.get('rev_growth', 0) * 100:.1f}%")
             g2.metric("EPS 成長率", f"{d.get('eps_growth', 0) * 100:.1f}%")
             g3.metric("淨利成長率", f"{d.get('net_income_growth', 0) * 100:.1f}%")
+            g4.metric("毛利成長率", "---")
+            g5.metric("營業利益成長率", "---")
+            g6.metric("資產成長率", "---")
+            g7.metric("權益成長率", "---")
 
             # 財務結構
             st.subheader("財務結構")
-            f1, f2, f3, f4 = st.columns(4)
+            f1, f2, f3, f4, f5, f6, f7 = st.columns(7)
             f1.metric("負債比率", f"{d.get('debt_ratio', 0) * 100:.1f}%")
             f2.metric("負債／股東權益", f"{d.get('debt_to_equity', 0) * 100:.1f}%")
             f3.metric("流動比率", f"{d.get('current_ratio', 0):.2f}")
             f4.metric("速動比率", f"{d.get('quick_ratio', 0):.2f}")
+            f5.metric("存貨佔資產比", "---")
+            f6.metric("現金佔資產比", "---")
+            f7.metric("非流動負債比", "---")
 
             # 現金流品質
             st.subheader("現金流品質")
-            c1, c2, c3 = st.columns(3)
-            c1.metric("營業現金流", f"{d.get('operating_cashflow', 0) / 1e8:.1f}億")
-            c2.metric("自由現金流 (FCF)", f"{d.get('free_cashflow', 0) / 1e8:.1f}億")
-            c3.metric("現金流／淨利", f"{d.get('cashflow_profit_ratio', 0):.2f}")
+            ca1, ca2, ca3, ca4, ca5, ca6, ca7 = st.columns(7)
+            ca1.metric("營業現金流", f"{d.get('operating_cashflow', 0) / 1e8:.1f}億")
+            ca2.metric("自由現金流 (FCF)", f"{d.get('free_cashflow', 0) / 1e8:.1f}億")
+            ca3.metric("現金流／淨利", f"{d.get('cashflow_profit_ratio', 0):.2f}")
+            ca4.metric("FCF／營收", f"{d.get('fcf_revenue_ratio', 0):.1%}")
+            ca5.metric("FCF／股價", f"{d.get('fcf_price_ratio', 0):.1%}")
+            ca6.metric("FCF 成長率", f"{d.get('fcf_growth', 0) * 100:.1f}%")
+            ca7.metric("資本支出／營業現金流", f"{d.get('capex_to_cashflow', 0):.2f}")
 
             # 估值水準
             st.subheader("估值水準")
-            v1, v2, v3, v4 = st.columns(4)
+            v1, v2, v3, v4, v5, v6, v7 = st.columns(7)
             v1.metric("本益比 (P/E)", f"{d.get('pe', 0):.1f}x")
             v2.metric("股價淨值比 (P/B)", f"{d.get('pb', 0):.1f}x")
             v3.metric("PEG", f"{d.get('peg', 0):.1f}")
             v4.metric("股利殖利率", f"{d.get('dividend_yield', 0) * 100:.1f}%")
+            v5.metric("盈餘配發率", f"{d.get('payout_ratio', 0) * 100:.1f}%")
+            v6.metric("現金股利報酬率", "---")
+            v7.metric("帳面價值成長率", "---")
 
 
         #  ========== 二、技術面（趨勢、動能、波動、量價）==========
@@ -412,6 +427,7 @@ if code_input:
                 st.error("🔧 請先在 Streamlit Cloud 設定 Secrets：App Settings → Secrets → GEMINI_API_KEY")
     else:
         st.error("❌ 請確認輸入正確的股票代碼（例如 2330、2317）")
+
 
 
 
