@@ -300,14 +300,6 @@ code_input = st.sidebar.text_input("🔍 輸入台股代碼", placeholder="2330"
 st.markdown("""
 <style>
 /* 重點先壓縮 header 本身的間距 */
-.stHeader {
-    margin-bottom: 2rem !important;      /* 超大空隙 */
-    padding-top: 0.5rem !important;
-    padding-bottom: 0.5rem !important;
-    background-color: pink !important;   /* 背景變粉紅 */
-    border: 2px solid red !important;
-}
-
 /* 標題 */
 h1 { 
     font-size: 1.8rem !important; 
@@ -316,6 +308,11 @@ h1 {
 h2, h3 { 
     color: red !important;
     font-size: 1.8rem !important;
+}
+.stHeader {
+    margin-bottom: 2rem !important;
+    background-color: pink !important;
+    border: 2px solid red !important;
 }
 
 /* metric 區 */
@@ -571,6 +568,7 @@ if code_input:
                 st.error("🔧 請先在 Streamlit Cloud 設定 Secrets：App Settings → Secrets → GEMINI_API_KEY")
     else:
         st.write("✅ 這是 Ray 的最新台股深度分析版本")
+
 
 
 
