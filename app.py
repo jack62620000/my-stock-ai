@@ -317,6 +317,11 @@ h3 {
     color: #2ECC71 !important;
     margin: 0.2rem 0 0.3rem 0 !important;
 }
+
+h4 { 
+    color: #53D4A0 !important;
+    margin: 0.2rem 0 0.3rem 0 !important;
+}
 /* 3. 小數據（metrics 的數字與標籤、你用的 col1/col2 內容） */
 /* 所有 metric 的數字（例如：9.8%、0.5% 這類） */
 .metric-value {
@@ -576,6 +581,7 @@ if code_input:
                 st.error("🔧 請先在 Streamlit Cloud 設定 Secrets：App Settings → Secrets → GEMINI_API_KEY")
     else:
         st.write("✅ 這是 Ray 的最新台股深度分析版本")
+
 
 
 
