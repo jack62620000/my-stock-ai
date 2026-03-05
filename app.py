@@ -455,12 +455,12 @@ if code_input:
         #  ========== 三、財務與資本結構（公司資本是否健康）==========
         st.header("🏦 三、財務與資本結構：公司資本是否健康")
         with st.container(border=True):
-            s1, s2, s3, s4, s5 = st.columns(5)
+            s1, s2, s3, s4 = st.columns(4)
             s1.metric("總資產", f"{d.get('total_assets', 0) / 1e9:.1f} 億")
             s2.metric("總負債", f"{d.get('total_liabilities', 0) / 1e9:.1f} 億")
             s3.metric("股東權益", f"{d.get('equity', 0) / 1e9:.1f} 億")
 
-            r1, r2, r3, r4, r5 = st.columns(5)
+            r1, r2, r3, r4 = st.columns(4)
             r1.metric("資本支出 (Capex)", f"{d.get('capex', 0) / 1e8:.1f} 億")
             r2.metric("資本支出／營業現金流", f"{d.get('capex_to_cashflow', 0):.2f}")
 
@@ -479,9 +479,9 @@ if code_input:
             st.write("• 若「盈餘配發率」接近 100%，代表公司多數盈餘用於配股，現金流留存較少。")
 
 
-        #  ========== 五、第三代：AI 終極戰情診斷（保留你的第三部分）==========
+        #  ========== 五、AI診斷（保留你的第三部分）==========
         st.markdown("---")
-        st.header("🤖 五、第三代：AI 終極戰情診斷")
+        st.header("🤖 五、AI診斷")
 
         api_status = st.secrets.get("GEMINI_API_KEY", "")
         col1, col2 = st.columns([1, 4])
@@ -504,6 +504,7 @@ if code_input:
                 st.error("🔧 請先在 Streamlit Cloud 設定 Secrets：App Settings → Secrets → GEMINI_API_KEY")
     else:
         st.error("❌ 請確認輸入正確的股票代碼（例如 2330、2317）")
+
 
 
 
