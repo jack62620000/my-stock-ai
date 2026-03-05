@@ -1001,7 +1001,8 @@ if code_input:
             else:
                 st.error("🔧 請先在 Streamlit Cloud 設定 Secrets：App Settings → Secrets → GEMINI_API_KEY")
     else:
-        st.write("✅ 這是 Ray 的最新台股深度分析版本")
+        st.write("✅這是Raymond的台股深度分析，請輸入正確的股票代碼")
+
 
 
 
