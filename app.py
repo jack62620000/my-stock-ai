@@ -301,9 +301,11 @@ st.markdown("""
 <style>
 /* 重點先壓縮 header 本身的間距 */
 .stHeader {
-    margin-bottom: 2rem !important;
-    background-color: pink !important;
-    padding: 0.5rem 0 !important;
+    margin-bottom: 2rem !important;      /* 超大空隙 */
+    padding-top: 0.5rem !important;
+    padding-bottom: 0.5rem !important;
+    background-color: pink !important;   /* 背景變粉紅 */
+    border: 2px solid red !important;
 }
 
 /* 標題 */
@@ -569,6 +571,7 @@ if code_input:
                 st.error("🔧 請先在 Streamlit Cloud 設定 Secrets：App Settings → Secrets → GEMINI_API_KEY")
     else:
         st.error("❌ 請確認輸入正確的股票代碼（例如 2330、2317）")
+
 
 
 
