@@ -397,14 +397,14 @@ if code_input:
 
             # 第一列：股價、漲跌、開盤、高點、低點
             t1, t2, t3, t4, t5, t6 = st.columns(6)
-            t1.metric("即時股價", f"{price:.1f}")
-            t2.metric("漲跌額", f"{change_price:+.1f}")
-            t3.metric("漲跌幅", f"{change_percent:+.1f}%")
+            t1.metric("即時股價：", f"{price:.1f}")
+            t2.metric("漲跌額：", f"{change_price:+.1f}")
+            t3.metric("漲跌幅：", f"{change_percent:+.1f}%")
 
             if not hist.empty:
-                t4.metric("今日開盤", f"{hist['Open'].iloc[-1]:.1f}")
-                t5.metric("今日高點", f"{hist['High'].iloc[-1]:.1f}")
-                t6.metric("今日低點", f"{hist['Low'].iloc[-1]:.1f}")
+                t4.metric("今日開盤：", f"{hist['Open'].iloc[-1]:.1f}")
+                t5.metric("今日高點：", f"{hist['High'].iloc[-1]:.1f}")
+                t6.metric("今日低點：", f"{hist['Low'].iloc[-1]:.1f}")
 
             st.markdown("---", unsafe_allow_html=True)
 
@@ -412,17 +412,17 @@ if code_input:
             r1, r2, r3, r4, r5, r6 = st.columns(6)
             rsi_now = d.get("rsi", 50)
             rsi_trend = "偏高" if rsi_now > 70 else "偏低" if rsi_now < 30 else "中間"
-            r1.metric("RSI 趨勢", rsi_trend)
-            r2.metric("即時 RSI", f"{rsi_now:.1f}")
+            r1.metric("RSI 趨勢：", rsi_trend)
+            r2.metric("即時 RSI：", f"{rsi_now:.1f}")
 
             df = d.get("df", pd.DataFrame())
             macd_line = df["macd"].iloc[-1] if "macd" in df.columns else 0.0
             macd_signal = df["macd_signal"].iloc[-1] if "macd_signal" in df.columns else 0.0
-            r3.metric("即時 MACD", f"{macd_line:+.2f}")
-            r4.metric("MACD 信號線", f"{macd_signal:+.2f}")
+            r3.metric("即時 MACD：", f"{macd_line:+.2f}")
+            r4.metric("MACD 信號線：", f"{macd_signal:+.2f}")
 
             volume = df["Volume"].iloc[-1] if "Volume" in df.columns and not pd.isna(df["Volume"].iloc[-1]) else 0
-            r5.metric("成交量 (張)", f"{int(volume / 1000):,}")
+            r5.metric("成交量(張)：", f"{int(volume / 1000):,}")
 
             # 量價判斷（只在有前一期資料時）
             volume_trend = "量價資訊不足"
@@ -433,7 +433,7 @@ if code_input:
                     volume_trend = "價漲量增"
                 else:
                     volume_trend = "價漲量縮"
-            r6.metric("盤中量價", volume_trend)
+            r6.metric("盤中量價：", volume_trend)
 
 #  ========== 一、基本面（公司賺不賺錢）==========
         st.header("📌 一、基本面：公司賺不賺錢")
@@ -441,57 +441,57 @@ if code_input:
             # 盈利能力
             st.subheader("盈利能力")
             c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
-            c1.metric("毛利率", f"{d.get('gross_profit', 0) * 100:.1f}%")
-            c2.metric("淨利率", f"{d.get('net_margin', 0) * 100:.1f}%")
-            c3.metric("營業利益率", f"{d.get('op_margin', 0) * 100:.1f}%")
-            c4.metric("EPS", f"{d.get('eps', 0):.2f}")
-            c5.metric("ROE", f"{d.get('roe', 0) * 100:.1f}%")
-            c6.metric("ROA", f"{d.get('roa', 0) * 100:.1f}%")
-            c7.metric("EPS 成長率", f"{d.get('eps_growth', 0) * 100:.1f}%")
+            c1.metric("毛利率：", f"{d.get('gross_profit', 0) * 100:.1f}%")
+            c2.metric("淨利率：", f"{d.get('net_margin', 0) * 100:.1f}%")
+            c3.metric("營業利益率：", f"{d.get('op_margin', 0) * 100:.1f}%")
+            c4.metric("EPS：", f"{d.get('eps', 0):.2f}")
+            c5.metric("ROE：", f"{d.get('roe', 0) * 100:.1f}%")
+            c6.metric("ROA：", f"{d.get('roa', 0) * 100:.1f}%")
+            c7.metric("EPS 成長率：", f"{d.get('eps_growth', 0) * 100:.1f}%")
      
             # 成長性
             st.subheader("成長性")
             g1, g2, g3, g4, g5, g6, g7 = st.columns(7)
-            g1.metric("營收成長率", f"{d.get('rev_growth', 0) * 100:.1f}%")
-            g2.metric("EPS 成長率", f"{d.get('eps_growth', 0) * 100:.1f}%")
-            g3.metric("淨利成長率", f"{d.get('net_income_growth', 0) * 100:.1f}%")
-            g4.metric("毛利成長率", f"{d.get('gross_profit_growth', 0) * 100:.1f}%")
-            g5.metric("營業利益成長率", f"{d.get('operating_income_growth', 0) * 100:.1f}%")
-            g6.metric("資產成長率", f"{d.get('assets_growth', 0) * 100:.1f}%")
-            g7.metric("權益成長率", f"{d.get('equity_growth', 0) * 100:.1f}%")
+            g1.metric("營收成長率：", f"{d.get('rev_growth', 0) * 100:.1f}%")
+            g2.metric("EPS 成長率：", f"{d.get('eps_growth', 0) * 100:.1f}%")
+            g3.metric("淨利成長率：", f"{d.get('net_income_growth', 0) * 100:.1f}%")
+            g4.metric("毛利成長率：", f"{d.get('gross_profit_growth', 0) * 100:.1f}%")
+            g5.metric("營業利益成長率：", f"{d.get('operating_income_growth', 0) * 100:.1f}%")
+            g6.metric("資產成長率：", f"{d.get('assets_growth', 0) * 100:.1f}%")
+            g7.metric("權益成長率：", f"{d.get('equity_growth', 0) * 100:.1f}%")
 
             # 財務結構
             st.subheader("財務結構")
             f1, f2, f3, f4, f5, f6, f7 = st.columns(7)
-            f1.metric("負債比率", f"{d.get('debt_ratio', 0) * 100:.1f}%")
-            f2.metric("負債／股東權益", f"{d.get('debt_to_equity', 0) * 100:.1f}%")
-            f3.metric("流動比率", f"{d.get('current_ratio', 0):.2f}")
-            f4.metric("速動比率", f"{d.get('quick_ratio', 0):.2f}")
-            f5.metric("存貨佔資產比", f"{d.get('inv_asset_ratio', 0):.1%}")
-            f6.metric("現金佔資產比", f"{d.get('cash_asset_ratio', 0):.1%}")
-            f7.metric("非流動負債占負債比", f"{d.get('ncd_liabilities_ratio', 0):.1%}")
+            f1.metric("負債比率：", f"{d.get('debt_ratio', 0) * 100:.1f}%")
+            f2.metric("負債／股東權益：", f"{d.get('debt_to_equity', 0) * 100:.1f}%")
+            f3.metric("流動比率：", f"{d.get('current_ratio', 0):.2f}")
+            f4.metric("速動比率：", f"{d.get('quick_ratio', 0):.2f}")
+            f5.metric("存貨佔資產比：", f"{d.get('inv_asset_ratio', 0):.1%}")
+            f6.metric("現金佔資產比：", f"{d.get('cash_asset_ratio', 0):.1%}")
+            f7.metric("非流動負債占負債比：", f"{d.get('ncd_liabilities_ratio', 0):.1%}")
 
             # 現金流品質
             st.subheader("現金流品質")
             ca1, ca2, ca3, ca4, ca5, ca6, ca7 = st.columns(7)
-            ca1.metric("營業現金流", f"{d.get('operating_cashflow', 0) / 1e8:.1f}億")
-            ca2.metric("自由現金流 (FCF)", f"{d.get('free_cashflow', 0) / 1e8:.1f}億")
-            ca3.metric("現金流／淨利", f"{d.get('cashflow_profit_ratio', 0):.2f}")
-            ca4.metric("FCF／營收", f"{d.get('fcf_revenue_ratio', 0):.1%}")
-            ca5.metric("FCF／股價", f"{d.get('fcf_price_ratio', 0):.1%}")
-            ca6.metric("FCF 成長率", f"{d.get('fcf_growth', 0) * 100:.1f}%")
-            ca7.metric("資本支出／營業現金流", f"{d.get('capex_to_cashflow', 0):.2f}")
+            ca1.metric("營業現金流：", f"{d.get('operating_cashflow', 0) / 1e8:.1f}億")
+            ca2.metric("自由現金流(FCF)：", f"{d.get('free_cashflow', 0) / 1e8:.1f}億")
+            ca3.metric("現金流/淨利：", f"{d.get('cashflow_profit_ratio', 0):.2f}")
+            ca4.metric("FCF/營收：", f"{d.get('fcf_revenue_ratio', 0):.1%}")
+            ca5.metric("FCF/股價：", f"{d.get('fcf_price_ratio', 0):.1%}")
+            ca6.metric("FCF 成長率：", f"{d.get('fcf_growth', 0) * 100:.1f}%")
+            ca7.metric("資本支出／營業現金流：", f"{d.get('capex_to_cashflow', 0):.2f}")
 
             # 估值水準
             st.subheader("估值水準")
             v1, v2, v3, v4, v5, v6, v7 = st.columns(7)
-            v1.metric("本益比 (P/E)", f"{d.get('pe', 0):.1f}x")
-            v2.metric("股價淨值比 (P/B)", f"{d.get('pb', 0):.1f}x")
-            v3.metric("PEG", f"{d.get('peg', 0):.1f}")
-            v4.metric("股利殖利率", f"{d.get('dividend_yield', 0) * 100:.1f}%")
-            v5.metric("盈餘配發率", f"{d.get('payout_ratio', 0) * 100:.1f}%")
-            v6.metric("現金股利報酬率", f"{d.get('cash_dividend_yield', 0) * 100:.1f}%")
-            v7.metric("帳面價值成長率", f"{d.get('book_value_growth', 0) * 100:.1f}%")
+            v1.metric("本益比(P/E)：", f"{d.get('pe', 0):.1f}x")
+            v2.metric("股價淨值比(P/B)：", f"{d.get('pb', 0):.1f}x")
+            v3.metric("PEG：", f"{d.get('peg', 0):.1f}")
+            v4.metric("股利殖利率：", f"{d.get('dividend_yield', 0) * 100:.1f}%")
+            v5.metric("盈餘配發率：", f"{d.get('payout_ratio', 0) * 100:.1f}%")
+            v6.metric("現金股利報酬率：", f"{d.get('cash_dividend_yield', 0) * 100:.1f}%")
+            v7.metric("帳面價值成長率：", f"{d.get('book_value_growth', 0) * 100:.1f}%")
             
 
         #  ========== 二、技術面（趨勢、動能、波動、量價）==========
@@ -506,30 +506,30 @@ if code_input:
 
                 # 趨勢與均線
                 t1.subheader("趨勢與均線")
-                t1.write(f"MA5: {latest.get('ma5', price):.1f}")
-                t1.write(f"MA20: {latest.get('ma20', price):.1f}")
-                t1.write(f"MA60: {latest.get('ma60', price):.1f}")
-                t1.write(f"乖離率: {d.get('bias', 0):.1f}%")
+                t1.write(f"MA5： {latest.get('ma5', price):.1f}")
+                t1.write(f"MA20： {latest.get('ma20', price):.1f}")
+                t1.write(f"MA60： {latest.get('ma60', price):.1f}")
+                t1.write(f"乖離率： {d.get('bias', 0):.1f}%")
 
                 # 動能與強度
                 t2.subheader("動能與強度")
-                t2.write(f"RSI: {d.get('rsi', 50):.1f}")
+                t2.write(f"RSI： {d.get('rsi', 50):.1f}")
                 macd_line = df["macd"].iloc[-1] if "macd" in df.columns else 0.0
                 macd_line = df["macd"].iloc[-1] if "macd" in df.columns else 0.0
                 macd_signal = df["macd_signal"].iloc[-1] if "macd_signal" in df.columns else 0.0
 
-                t2.write(f"MACD 本體: {macd_line:+.2f}")
-                t2.write(f"MACD 信號線: {macd_signal:+.2f}")
+                t2.write(f"MACD 本體： {macd_line:+.2f}")
+                t2.write(f"MACD 信號線： {macd_signal:+.2f}")
 
                 # 波動與區間
                 t3.subheader("波動與區間")
-                t3.write(f"布林上: {d.get('bb_upper', 0):.1f}")
-                t3.write(f"布林中: {d.get('bb_mid', 0):.1f}")
-                t3.write(f"布林下: {d.get('bb_lower', 0):.1f}")
-                t3.write(f"52週高價: {d.get('52高', 0):.1f}")
-                t3.write(f"52週低價: {d.get('52低', 0):.1f}")
-                t3.write(f"標準差 (20日): {df['std'].iloc[-1]:.2f}")
-                t3.write(f"ATR (14日): {d.get('atr', 0):.2f}")
+                t3.write(f"布林上： {d.get('bb_upper', 0):.1f}")
+                t3.write(f"布林中： {d.get('bb_mid', 0):.1f}")
+                t3.write(f"布林下： {d.get('bb_lower', 0):.1f}")
+                t3.write(f"52週高價： {d.get('52高', 0):.1f}")
+                t3.write(f"52週低價： {d.get('52低', 0):.1f}")
+                t3.write(f"標準差(20日)： {df['std'].iloc[-1]:.2f}")
+                t3.write(f"ATR(14日)： {d.get('atr', 0):.2f}")
 
                 # 成交量與量價關係
                 t4.subheader("成交量與量價關係")
@@ -553,26 +553,26 @@ if code_input:
         st.header("🏦 三、財務與資本結構：公司資本是否健康")
         with st.container(border=True):
             s1, s2, s3, s4 = st.columns(4)
-            s1.metric("總資產", f"{d.get('total_assets', 0) / 1e9:.1f} 億")
-            s2.metric("總負債", f"{d.get('total_liabilities', 0) / 1e9:.1f} 億")
-            s3.metric("股東權益", f"{d.get('equity', 0) / 1e9:.1f} 億")
+            s1.metric("總資產：", f"{d.get('total_assets', 0) / 1e9:.1f} 億")
+            s2.metric("總負債：", f"{d.get('total_liabilities', 0) / 1e9:.1f} 億")
+            s3.metric("股東權益：", f"{d.get('equity', 0) / 1e9:.1f} 億")
 
             r1, r2, r3, r4 = st.columns(4)
-            r1.metric("資本支出 (Capex)", f"{d.get('capex', 0) / 1e8:.1f} 億")
-            r2.metric("資本支出／營業現金流", f"{d.get('capex_to_cashflow', 0):.2f}")
+            r1.metric("資本支出(Capex)：", f"{d.get('capex', 0) / 1e8:.1f} 億")
+            r2.metric("資本支出/營業現金流：", f"{d.get('capex_to_cashflow', 0):.2f}")
 
 
         #  ========== 四、現金流與股利（現金能不能穩定入袋）==========
         st.header("💵 四、現金流與股利：現金能不能穩定入袋")
         with st.container(border=True):
             f1, f2, f3, f4 = st.columns(4)
-            f1.metric("自由現金流／營收", f"{d.get('fcf_revenue_ratio', 0):.1%}")
-            f2.metric("自由現金流／股價", f"{d.get('fcf_price_ratio', 0):.1%}")
-            f3.metric("FCF 成長率", f"{d.get('fcf_growth', 0) * 100:.1f}%")
-            f4.metric("盈餘配發率", f"{d.get('payout_ratio', 0) * 100:.1f}%")
+            f1.metric("自由現金流/營收：", f"{d.get('fcf_revenue_ratio', 0):.1%}")
+            f2.metric("自由現金流/股價：", f"{d.get('fcf_price_ratio', 0):.1%}")
+            f3.metric("FCF成長率：", f"{d.get('fcf_growth', 0) * 100:.1f}%")
+            f4.metric("盈餘配發率：", f"{d.get('payout_ratio', 0) * 100:.1f}%")
 
             st.write("說明：")
-            st.write("• 若「自由現金流／股價」為正，表示每單位股價背後有實質現金支撐。")
+            st.write("• 若「自由現金流/股價」為正，表示每單位股價背後有實質現金支撐。")
             st.write("• 若「盈餘配發率」接近 100%，代表公司多數盈餘用於配股，現金流留存較少。")
 
 
@@ -601,6 +601,7 @@ if code_input:
                 st.error("🔧 請先在 Streamlit Cloud 設定 Secrets：App Settings → Secrets → GEMINI_API_KEY")
     else:
         st.write("✅ 這是 Ray 的最新台股深度分析版本")
+
 
 
 
