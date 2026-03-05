@@ -312,14 +312,6 @@ h2.st-emotion-cache-gi0tri {
     color: #E67E22 !important;
     font-size: 1.4rem !important;
 }
-/* 你也可以單獨指定某一項 subheader（例如：盈利能力）用不同顏色 */
-/* 用 inspect 去抓「盈利能力」那一行的 class，下面這個只是範例 */
-.st-emotion-cache-AAAAAA {
-    color: #6A53D4 !important;          /* 紅色，可改成 #3498DB（藍）等 */
-    font-size: 1.2rem !important;
-}
-
-
 /* 3. 小數據（metrics 的數字與標籤、你用的 col1/col2 內容） */
 /* 所有 metric 的數字（例如：9.8%、0.5% 這類） */
 .metric-value {
@@ -579,6 +571,7 @@ if code_input:
                 st.error("🔧 請先在 Streamlit Cloud 設定 Secrets：App Settings → Secrets → GEMINI_API_KEY")
     else:
         st.write("✅ 這是 Ray 的最新台股深度分析版本")
+
 
 
 
