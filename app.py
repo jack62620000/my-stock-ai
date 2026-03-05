@@ -8,13 +8,21 @@ import numpy as np
 # ========= 🎨 統一文字大小 =========
 st.markdown("""
 <style>
-/* 標題 */
-h1 { font-size: 1.8rem !important; margin-bottom: 0.5rem !important; }
-h2, h3 { font-size: 1.6rem !important; margin: 0.2rem 0 0.3rem 0.3 !important; }
-
+/* 重點先壓縮 header 本身的間距 */
 .stHeader {
-        margin-bottom: 0rem !important;
-    }
+    margin-bottom: 0.1rem !important;
+}
+
+/* 標題 */
+h1 { 
+    font-size: 1.8rem !important; 
+    margin-bottom: 0.5rem !important; 
+}
+h2, h3 { 
+    font-size: 1.6rem !important; 
+    margin: 0.2rem 0 0.3rem 0 !important; 
+}
+
 /* 容器內文字統一 */
 .metric-container { 
     font-size: 1rem !important; 
@@ -40,6 +48,7 @@ div[data-testid="column"] p, div[data-testid="column"] div {
 }
 </style>
 """, unsafe_allow_html=True)
+
 
 st.set_page_config(page_title="台股深度分析", layout="wide")
 
@@ -576,6 +585,7 @@ if code_input:
                 st.error("🔧 請先在 Streamlit Cloud 設定 Secrets：App Settings → Secrets → GEMINI_API_KEY")
     else:
         st.error("❌ 請確認輸入正確的股票代碼（例如 2330、2317）")
+
 
 
 
