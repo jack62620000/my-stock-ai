@@ -455,12 +455,12 @@ if code_input:
         #  ========== 三、財務與資本結構（公司資本是否健康）==========
         st.header("🏦 三、財務與資本結構：公司資本是否健康")
         with st.container(border=True):
-            s1, s2, s3 = st.columns(3)
+            s1, s2, s3, s4, s5 = st.columns(5)
             s1.metric("總資產", f"{d.get('total_assets', 0) / 1e9:.1f} 億")
             s2.metric("總負債", f"{d.get('total_liabilities', 0) / 1e9:.1f} 億")
             s3.metric("股東權益", f"{d.get('equity', 0) / 1e9:.1f} 億")
 
-            r1, r2 , r3 = st.columns(3)
+            r1, r2, r3, r4, r5 = st.columns(5)
             r1.metric("資本支出 (Capex)", f"{d.get('capex', 0) / 1e8:.1f} 億")
             r2.metric("資本支出／營業現金流", f"{d.get('capex_to_cashflow', 0):.2f}")
 
@@ -504,6 +504,7 @@ if code_input:
                 st.error("🔧 請先在 Streamlit Cloud 設定 Secrets：App Settings → Secrets → GEMINI_API_KEY")
     else:
         st.error("❌ 請確認輸入正確的股票代碼（例如 2330、2317）")
+
 
 
 
