@@ -302,8 +302,8 @@ st.markdown("""
 /* 1. 大標題：📌 一、基本面、📉 二、技術面、🏦 三、財務與資本結構、💵 四、現金流與股利、🤖 五、AI診斷 */
 /* 你只需要把 .st-emotion-cache-gi0tri 換成你 inspect 出來的 header class，如果二、三、四、五不同也要補上 */
 .st-emotion-cache-gi0tri {
-    color: #0066ff !important;          /* 藍色，可改成 #E74C3C（紅）、#27AE60（綠）等 */
-    font-size: 1.7rem !important;
+    color: #0095FF !important;          /* 藍色，可改成 #E74C3C（紅）、#27AE60（綠）等 */
+    font-size: 1.8rem !important;
     margin-bottom: 0.05rem !important;
     margin-top: 0.1rem !important;
     padding-top: 0.05rem !important;
@@ -311,29 +311,10 @@ st.markdown("""
     line-height: 1.1 !important;
 }
 
-/* 二、技術面、三、財務、四、現金流、五、AI診斷 的 header（如果 inspect 出來的 class 不同，請補上，否則可刪掉不用） */
-.st-emotion-cache-XXX1 {
-    color: #0066ff !important;
-    font-size: 1.7rem !important;
-}
-.st-emotion-cache-XXX2 {
-    color: #0066ff !important;
-    font-size: 1.7rem !important;
-}
-.st-emotion-cache-XXX3 {
-    color: #0066ff !important;
-    font-size: 1.7rem !important;
-}
-.st-emotion-cache-XXX4 {
-    color: #0066ff !important;
-    font-size: 1.7rem !important;
-}
-
-
 /* 2. 小標題：盈利能力、成長性、財務結構、現金流品質、估值水準、趨勢與均線、動能與強度、波動與區間、成交量與量價關係 */
 /* 這些都是 st.subheader，會變成 h2 */
 h2 {
-    color: #E67E22 !important;          /* 橘色，可改為 #27AE60（綠）、#34495E（深灰） */
+    color: #00B7FF !important;          /* 橘色，可改為 #27AE60（綠）、#34495E（深灰） */
     font-size: 1.4rem !important;
     margin-top: 0.5rem !important;
     margin-bottom: 0.2rem !important;
@@ -342,8 +323,8 @@ h2 {
 /* 你也可以單獨指定某一項 subheader（例如：盈利能力）用不同顏色 */
 /* 用 inspect 去抓「盈利能力」那一行的 class，下面這個只是範例 */
 .st-emotion-cache-AAAAAA {
-    color: #E74C3C !important;          /* 紅色，可改成 #3498DB（藍）等 */
-    font-size: 1.4rem !important;
+    color: #6A53D4 !important;          /* 紅色，可改成 #3498DB（藍）等 */
+    font-size: 1.2rem !important;
 }
 
 
@@ -606,6 +587,7 @@ if code_input:
                 st.error("🔧 請先在 Streamlit Cloud 設定 Secrets：App Settings → Secrets → GEMINI_API_KEY")
     else:
         st.write("✅ 這是 Ray 的最新台股深度分析版本")
+
 
 
 
