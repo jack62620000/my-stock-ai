@@ -326,11 +326,11 @@ if code_input:
                 t2.subheader("動能與強度")
                 t2.write(f"RSI: {d.get('rsi', 50):.1f}")
                 macd_line = df["macd"].iloc[-1] if "macd" in df.columns else 0.0
-macd_line = df["macd"].iloc[-1] if "macd" in df.columns else 0.0
-macd_signal = df["macd_signal"].iloc[-1] if "macd_signal" in df.columns else 0.0
+                macd_line = df["macd"].iloc[-1] if "macd" in df.columns else 0.0
+                macd_signal = df["macd_signal"].iloc[-1] if "macd_signal" in df.columns else 0.0
 
-t2.write(f"MACD 本體: {macd_line:+.2f}")
-t2.write(f"MACD 信號線: {macd_signal:+.2f}")
+                t2.write(f"MACD 本體: {macd_line:+.2f}")
+                t2.write(f"MACD 信號線: {macd_signal:+.2f}")
 
                 # 波動與區間
                 t3.subheader("波動與區間")
@@ -402,6 +402,7 @@ t2.write(f"MACD 信號線: {macd_signal:+.2f}")
                 st.error("🔧 請先在 Streamlit Cloud 設定 Secrets：App Settings → Secrets → GEMINI_API_KEY")
     else:
         st.error("❌ 請確認輸入正確的股票代碼（例如 2330、2317）")
+
 
 
 
