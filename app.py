@@ -299,45 +299,82 @@ code_input = st.sidebar.text_input("🔍 輸入台股代碼", placeholder="2330"
 # 這一段 CSS 要貼在這裡，UI 開始之後、任何 st.header 之前
 st.markdown("""
 <style>
-/* 重點先壓縮 header 本身的間距 */
-/* 標題 */
-h1 { 
-    font-size: 1.8rem !important; 
-    margin-bottom: 0.5rem !important; 
-}
-h2, h3 { 
-    color: red !important;
-    font-size: 1.8rem !important;
-}
+/* 1. 大標題：📌 一、基本面、📉 二、技術面、🏦 三、財務與資本結構、💵 四、現金流與股利、🤖 五、AI診斷 */
+/* 你只需要把 .st-emotion-cache-gi0tri 換成你 inspect 出來的 header class，如果二、三、四、五不同也要補上 */
 .st-emotion-cache-gi0tri {
-    margin-bottom: 0.01rem !important;
-    padding-top: 0.1rem !important;
-    padding-bottom: 0.1rem !important;
-    background-color: none !important;
+    color: #0066ff !important;          /* 藍色，可改成 #E74C3C（紅）、#27AE60（綠）等 */
+    font-size: 1.7rem !important;
+    margin-bottom: 0.05rem !important;
+    margin-top: 0.1rem !important;
+    padding-top: 0.05rem !important;
+    padding-bottom: 0.05rem !important;
+    line-height: 1.1 !important;
 }
 
-/* metric 區 */
-.metric-container { 
-    font-size: 1rem !important; 
-    margin-bottom: 0.1rem !important; 
+/* 二、技術面、三、財務、四、現金流、五、AI診斷 的 header（如果 inspect 出來的 class 不同，請補上，否則可刪掉不用） */
+.st-emotion-cache-XXX1 {
+    color: #0066ff !important;
+    font-size: 1.7rem !important;
 }
-.metric-value { 
-    font-size: 1.5rem !important; 
+.st-emotion-cache-XXX2 {
+    color: #0066ff !important;
+    font-size: 1.7rem !important;
 }
-.metric-label { 
-    font-size: 0.8rem !important; 
+.st-emotion-cache-XXX3 {
+    color: #0066ff !important;
+    font-size: 1.7rem !important;
+}
+.st-emotion-cache-XXX4 {
+    color: #0066ff !important;
+    font-size: 1.7rem !important;
 }
 
-/* 一般文字統一 */
-div[data-testid="column"] p, div[data-testid="column"] div {
-    font-size: 0.95rem !important;
-    line-height: 1.3 !important;
+
+/* 2. 小標題：盈利能力、成長性、財務結構、現金流品質、估值水準、趨勢與均線、動能與強度、波動與區間、成交量與量價關係 */
+/* 這些都是 st.subheader，會變成 h2 */
+h2 {
+    color: #E67E22 !important;          /* 橘色，可改為 #27AE60（綠）、#34495E（深灰） */
+    font-size: 1.4rem !important;
+    margin-top: 0.5rem !important;
+    margin-bottom: 0.2rem !important;
 }
 
-/* 解決 st.write 大小 */
+/* 你也可以單獨指定某一項 subheader（例如：盈利能力）用不同顏色 */
+/* 用 inspect 去抓「盈利能力」那一行的 class，下面這個只是範例 */
+.st-emotion-cache-AAAAAA {
+    color: #E74C3C !important;          /* 紅色，可改成 #3498DB（藍）等 */
+    font-size: 1.4rem !important;
+}
+
+
+/* 3. 小數據（metrics 的數字與標籤、你用的 col1/col2 內容） */
+/* 所有 metric 的數字（例如：9.8%、0.5% 這類） */
+.metric-value {
+    color: #2ECC71 !important;          /* 綠色，可改為 #E74C3C（紅）、#F39C12（橙） */
+    font-size: 1.5rem !important;
+}
+
+/* 所有 metric 的標籤（例如：毛利率、淨利率、EPS） */
+.metric-label {
+    color: #555555 !important;          /* 深灰，可改為 #888（更淺灰）、#0066ff（藍） */
+    font-size: 0.8rem !important;
+}
+
+/* 一般段落文字（例如：你用的 st.write / st.markdown 說明文字） */
 .element-container p {
+    color: #333333 !important;          /* 深黑，可改成 #444444 */
     font-size: 0.95rem !important;
     margin: 0.2rem 0 !important;
+}
+
+
+/* 4. 你原本的「壓緊 header 間距」設定，保留在這，不會影響顏色 */
+.st-emotion-cache-gi0tri {
+    margin-bottom: 0.05rem !important;
+    margin-top: 0.1rem !important;
+    padding-top: 0.05rem !important;
+    padding-bottom: 0.05rem !important;
+    line-height: 1.1 !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -569,6 +606,7 @@ if code_input:
                 st.error("🔧 請先在 Streamlit Cloud 設定 Secrets：App Settings → Secrets → GEMINI_API_KEY")
     else:
         st.write("✅ 這是 Ray 的最新台股深度分析版本")
+
 
 
 
