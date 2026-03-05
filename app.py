@@ -5,293 +5,385 @@ import pandas_ta as ta
 import google.generativeai as genai
 import numpy as np
 
-# ========= 🎨 完美統一文字大小 =========
+# ========= 🎨 統一文字大小 =========
 st.markdown("""
 <style>
 /* 標題 */
 h1 { font-size: 2.2rem !important; margin-bottom: 1rem !important; }
 h2, h3 { font-size: 1.6rem !important; margin: 0.3rem 0 0.5rem 0 !important; }
 
-/* 容器框內文字統一 */
-.st-emotion-cache-1r4fnda {
-    padding: 0.8rem 1.2rem !important;
-    margin-bottom: 0.5rem !important;
+/* 容器內文字統一 */
+.metric-container {
+font-size: 1.0rem !important;
+margin-bottom: 0.3rem !important;
 }
-
-/* Metric文字統一 */
-.metric-container { 
-    font-size: 1.0rem !important; 
-    margin-bottom: 0.3rem !important; 
+.metric-value {
+font-size: 1.4rem !important;
 }
-.metric-value { 
-    font-size: 1.4rem !important; 
-}
-.metric-label { 
-    font-size: 0.85rem !important; 
+.metric-label {
+font-size: 0.85rem !important;
 }
 
 /* 一般文字統一 */
 div[data-testid="column"] p, div[data-testid="column"] div {
-    font-size: 0.95rem !important;
-    line-height: 1.3 !important;
+font-size: 0.95rem !important;
+line-height: 1.3 !important;
 }
 
-/* 解決st.write大小問題 */
+/* 解決 st.write 大小 */
 .element-container p {
-    font-size: 0.95rem !important;
-    margin: 0.2rem 0 !important;
+font-size: 0.95rem !important;
+margin: 0.2rem 0 !important;
 }
 </style>
 """, unsafe_allow_html=True)
 
-st.set_page_config(page_title="台股分析", layout="wide")
+st.set_page_config(page_title="台股深度分析", layout="wide")
 
-# --- 1. 名稱抓取 ---
+# --- 1. 股票名稱抓取 ---
 @st.cache_data(ttl=86400)
 def get_all_names():
-    names = {"2330": "台積電", "3131": "弘塑", "2317": "鴻海"}
-    try:
-        for url in ["https://isin.twse.com.tw/isin/C_public.jsp?strMode=2", "https://isin.twse.com.tw/isin/C_public.jsp?strMode=4"]:
-            df = pd.read_html(url)[0]
-            for item in df[0]:
-                if '　' in str(item):
-                    p = str(item).split('　')
-                    if len(p) >= 2: names[p[0].strip()] = p[1].strip()
-    except: pass
-    return names
+names = {"2330": "台積電", "3131": "弘塑", "2317": "鴻海"}
+try:
+for url in ["https://isin.twse.com.tw/isin/C_public.jsp?strMode=2", "https://isin.twse.com.tw/isin/C_public.jsp?strMode=4"]:
+df = pd.read_html(url)[0]
+for item in df[0]:
+if '　' in str(item):
+p = str(item).split('　')
+if len(p) >= 2:
+names[p[0].strip()] = p[1].strip()
+except Exception:
+pass
+return names
 
 name_map = get_all_names()
 
-st.sidebar.markdown("### 📈 **台股AI診斷**")
+st.sidebar.markdown("### 📈 **台股深度分析**")
 st.sidebar.markdown("---")
 
-# --- 2. 核心數據（🔥 完整修正版）---
+# --- 2. 核心資料與指標計算 ---
 @st.cache_data(ttl=300)
-def get_comprehensive_data(code):
-    for suffix in [".TW", ".TWO"]:
-        try:
-            ticker = yf.Ticker(f"{code}{suffix}")
-            hist = ticker.history(period="1y")
-            if hist.empty: continue
-            info = ticker.info
-            
-            price = hist['Close'].iloc[-1]
-            
-            # 🔥 完整財報數據
-            financials = {
-                # 價格與估值
-                'p': price,
-                'pe_b': 22.5 if "Semiconductor" in info.get('industry', '') else 15,
-                'intrinsic': info.get('trailingEps', 0) * (22.5 if "Semiconductor" in info.get('industry', '') else 15),
-                'safety': (info.get('trailingEps', 0) * 22.5 / price) - 1 if price > 0 else 0,
-                'pos_52': (price - hist['Low'].min()) / (hist['High'].max() - hist['Low'].min()) if hist['High'].max() > hist['Low'].min() else 0,
-                
-                # 獲利能力
-                'eps': info.get('trailingEps', 0),
-                'forward_eps': info.get('forwardEps', 0),
-                'roe': info.get('returnOnEquity', 0),
-                'gross_margin': info.get('grossMargins', 0),
-                'operating_margin': info.get('operatingMargins', 0),
-                'profit_margin': info.get('profitMargins', 0),
-                
-                # 成長性
-                'revenue_growth': info.get('revenueGrowth', 0),
-                'earnings_growth': info.get('earningsGrowth', 0),
-                
-                # 財務安全
-                'debt_to_equity': info.get('debtToEquity', 0) / 100,
-                'current_ratio': info.get('currentRatio', 0),
-                'quick_ratio': info.get('quickRatio', 0),
-                'fcf': info.get('freeCashflow', 0) / 100000000,
-                
-                # 估值
-                'trailing_pe': info.get('trailingPE', 0),
-                'forward_pe': info.get('forwardPE', 0),
-                'price_to_book': info.get('priceToBook', 0),
-                'peg_ratio': info.get('pegRatio', 0),
-                
-                # 股利
-                'dividend_yield': info.get('dividendYield', 0),
-                'payout_ratio': info.get('payoutRatio', 0),
-                
-                # 技術面原始數據
-                'df': hist,
-                'name': name_map.get(code, code),
-                'info': info  # 🔥 保留完整info
-            }
-            
-            # 🔥 計算所有必要技術指標
-            df = hist.copy()
-            
-            # 均線
-            df['MA20'] = ta.sma(df['Close'], length=20)
-            
-            # RSI
-            df['RSI'] = ta.rsi(df['Close'], length=14)
-            
-            # KD指標
-            stoch = ta.stoch(df['High'], df['Low'], df['Close'])
-            if stoch is not None and not stoch.empty:
-                df['stoch'] = stoch['STOCHk_14_3_3']
-                df['stochd'] = stoch['STOCHd_14_3_3']
-            else:
-                df['stoch'] = 50  # 預設值
-                df['stochd'] = 50
-            
-            # 計算衍生數據
-            financials['pe_ratio'] = price / max(financials['eps'], 0.01)
-            financials['rsi'] = df['RSI'].iloc[-1]
-            financials['df'] = df
-            
-            # 🔥 補齊財報顯示所需欄位（使用安全預設值）
-            financials.update({
-                'gp': financials['gross_margin'],
-                'op': financials['operating_margin'],
-                'debt': financials['debt_to_equity'],
-                'rev': financials['revenue_growth'],
-                'div': financials['dividend_yield']
-            })
-            
-            return financials
-            
-        except Exception:
-            continue
-    return None
+def get_deep_analysis_data(code):
+for suffix in [".TW", ".TWO"]:
+try:
+ticker = yf.Ticker(f"{code}{suffix}")
+hist = ticker.history(period="1y")
+if hist.empty:
+continue
+info = ticker.info
+price = hist["Close"].iloc[-1]
 
-# --- 3. AI報告（修正）---
+# 基本面指標（info 可用欄位）
+eps = info.get("trailingEps", np.nan)
+pb = info.get("priceToBook", np.nan)
+pe = info.get("trailingPE", np.nan)
+div_yield = info.get("dividendYield", np.nan)
+rev_growth = info.get("revenueGrowth", np.nan)
+eps_growth = info.get("earningsGrowth", np.nan)
+
+gross_profit = info.get("grossMargins", 0) # 毛利率
+net_margin = info.get("profitMargins", 0) # 淨利率
+op_margin = info.get("operatingMargins", 0) # 營業利益率
+roe = info.get("returnOnEquity", 0)
+roa = info.get("returnOnAssets", 0)
+debt_to_equity = info.get("debtToEquity", 0) / 100.0
+current_ratio = info.get("currentRatio", np.nan)
+quick_ratio = info.get("quickRatio", np.nan)
+payout_ratio = info.get("payoutRatio", 0)
+
+# 財務報表（收入、資產、負債、現金流）
+try:
+financials = ticker.financials
+income = financials.loc["Net Income"] if "Net Income" in financials.index else pd.Series([np.nan])
+revenue = financials.loc["Total Revenue"] if "Total Revenue" in financials.index else pd.Series([np.nan])
+net_income = income.iloc[0] if not income.empty and not pd.isna(income.iloc[0]) else np.nan
+net_rev = revenue.iloc[0] if not revenue.empty and not pd.isna(revenue.iloc[0]) else np.nan
+except:
+net_income = np.nan
+net_rev = np.nan
+
+try:
+balance_sheet = ticker.balance_sheet
+total_assets = balance_sheet.loc["Total Assets"].iloc[0] if "Total Assets" in balance_sheet.index else np.nan
+total_liabilities = balance_sheet.loc["Total Liabilities Net Minority Interest"].iloc[0] if "Total Liabilities Net Minority Interest" in balance_sheet.index else np.nan
+equity = balance_sheet.loc["Total Equity Gross Minority Interest"].iloc[0] if "Total Equity Gross Minority Interest" in balance_sheet.index else np.nan
+except:
+total_assets = np.nan
+total_liabilities = np.nan
+equity = np.nan
+
+try:
+cashflow = ticker.cashflow
+operating_cashflow = cashflow.loc["Operating Cash Flow"].iloc[0] if "Operating Cash Flow" in cashflow.index else np.nan
+capex = -cashflow.loc["Capital Expenditure"].iloc[0] if "Capital Expenditure" in cashflow.index else 0.0
+free_cashflow = operating_cashflow - capex
+except:
+operating_cashflow = np.nan
+capex = np.nan
+free_cashflow = np.nan
+
+# 基本面指標計算
+debt_ratio = total_liabilities / total_assets if total_assets else np.nan
+net_income_growth = eps_growth # 用 earningsGrowth 代表盈餘成長率
+cashflow_profit_ratio = operating_cashflow / net_income if net_income else np.nan
+fcf_revenue_ratio = free_cashflow / net_rev if net_rev else np.nan
+fcf_price_ratio = free_cashflow / (price * 1e8) if price and free_cashflow else np.nan
+fcf_growth = eps_growth # 用盈餘成長率近似 FCF 成長
+
+# 技術面指標（基於歷史股價）
+df = hist.copy()
+df["ma5"] = ta.sma(df["Close"], 5)
+df["ma20"] = ta.sma(df["Close"], 20)
+df["ma60"] = ta.sma(df["Close"], 60)
+df["偏差"] = (df["Close"] - df["ma20"]) / df["ma20"]
+df["rsi"] = ta.rsi(df["Close"], 14)
+df["macd"], df["macd_signal"], _ = ta.macd(df["Close"])
+df["布林上"], df["布林中"], df["布林下"] = ta.bbands(df["Close"]).iloc[:, 0], ta.bbands(df["Close"]).iloc[:, 1], ta.bbands(df["Close"]).iloc[:, 2]
+df["52高"] = df["High"].max()
+df["52低"] = df["Low"].min()
+df["std"] = df["Close"].rolling(window=20).std()
+df["atr"] = ta.atr(df["High"], df["Low"], df["Close"], 14)
+
+latest = df.iloc[-1]
+rsi = latest.get("rsi", 50)
+ma5 = latest.get("ma5", price)
+ma20 = latest.get("ma20", price)
+ma60 = latest.get("ma60", price)
+bb_upper = latest.get("布林上", np.nan)
+bb_lower = latest.get("布林下", np.nan)
+bb_mid = latest.get("布林中", np.nan)
+bias = latest.get("偏差", 0) * 100
+atr = latest.get("atr", 0)
+
+return {
+"price": price,
+"name": name_map.get(code, code),
+"info": info,
+
+# 基本面
+"gross_profit": gross_profit,
+"net_margin": net_margin,
+"op_margin": op_margin,
+"eps": eps,
+"roe": roe,
+"roa": roa,
+"rev_growth": rev_growth,
+"eps_growth": eps_growth,
+"net_income_growth": net_income_growth,
+"debt_ratio": debt_ratio,
+"debt_to_equity": debt_to_equity,
+"current_ratio": current_ratio,
+"quick_ratio": quick_ratio,
+"operating_cashflow": operating_cashflow,
+"free_cashflow": free_cashflow,
+"cashflow_profit_ratio": cashflow_profit_ratio,
+"pe": pe,
+"pb": pb,
+"peg": info.get("pegRatio", np.nan),
+"dividend_yield": div_yield,
+"payout_ratio": payout_ratio,
+
+# 技術面
+"df": df,
+"rsi": rsi,
+"ma5": ma5,
+"ma20": ma20,
+"ma60": ma60,
+"bias": bias,
+"bb_upper": bb_upper,
+"bb_lower": bb_lower,
+"bb_mid": bb_mid,
+"atr": atr,
+
+# 財務與資本結構
+"total_assets": total_assets,
+"total_liabilities": total_liabilities,
+"equity": equity,
+"capex": capex,
+"capex_to_cashflow": capex / operating_cashflow if operating_cashflow else np.nan,
+
+# 現金流與股利
+"fcf_revenue_ratio": fcf_revenue_ratio,
+"fcf_price_ratio": fcf_price_ratio,
+"fcf_growth": fcf_growth,
+}
+except Exception as e:
+st.warning(f"代碼 {code}{suffix} 錯誤：{e}")
+continue
+return None
+
+# --- 3. AI 會話（保留第三部分）---
 @st.cache_data(ttl=86400)
 def get_ai_analysis_report(d, code, api_key):
-    try:
-        genai.configure(api_key=api_key.strip())
-        model = genai.GenerativeModel('gemini-2.5-flash')
-        
-        df = d['df']
-        latest = df.iloc[-1]
-        k_val = latest.get('stoch', 50)
-        d_val = latest.get('stochd', 50)
-        
-        prompt = f"""針對 {d['name']} ({code})：
-現價 {round(d['p'], 1)}元, ROE {round(d['roe']*100, 2)}%
-K值 {round(k_val, 1)}, RSI {round(latest.get('RSI', 50), 1)}
-合理價 {round(d['intrinsic'], 1)}元
+try:
+genai.configure(api_key=api_key.strip())
+model = genai.GenerativeModel("gemini-2.5-flash")
+
+eps = d.get("eps", 0)
+pe = d.get("pe", 0)
+roe = d.get("roe", 0)
+rsi = d.get("rsi", 50)
+price = d.get("price", 0)
+
+prompt = f"""針對 {d['name']} ({code})：
+現價 {round(price, 1)} 元，EPS {round(eps, 2)}，本益比 {round(pe, 1)}，ROE {round(roe*100, 1)}%
+RSI {round(rsi, 1)}，技術面多空由 MA5 / MA20 / MA60 趨勢判斷。
 
 請依序回答：
-1. 🌍全球局勢影響
-2. 💎護城河分析  
-3. 📉技術面判斷
-4. 🎯目標價預估
-5. 📈投資建議"""
+1. 🌍 全球與產業局勢影響
+2. 💎 公司護城河與基本面健康度
+3. 📉 基本面與技術面綜合判斷
+4. 🎯 合理價與目標價區間
+5. 📈 投資建議與風險提示"""
 
-        response = model.generate_content(prompt)
-        return response.text
-    except Exception as e:
-        return f"⚠️ AI錯誤：{str(e)[:80]}"
-
-# --- 4. UI ---
+response = model.generate_content(prompt)
+return response.text
+except Exception as e:
+return f"⚠️ AI 錯誤：{str(e)[:80]}"
+# --- 4. UI 主畫面 ---
 code_input = st.sidebar.text_input("🔍 輸入台股代碼", placeholder="2330").strip().upper()
 
 if code_input:
-    with st.spinner(f'🔄 正在分析 {code_input}...'):
-        d = get_comprehensive_data(code_input)
-    
-    if d:
-        st.title(f"📊 {d.get('name', code_input)} ({code_input})")
-        
-        # 第一部分：完整財報（修正）
-        st.header("📋 第一部分：完整財報")
-        with st.container(border=True):
-            # 第1列
-            c1,c2,c3,c4,c5,c6,c7 = st.columns(7)
-            c1.metric("現價", f"${round(d.get('p',0),1):,.0f}")
-            c2.metric("合理價", f"${round(d.get('intrinsic',0),1):,.0f}")
-            c3.metric("安全邊際", f"{d.get('safety',0)*100:.1f}%")
-            c4.metric("52週", f"{d.get('pos_52',0)*100:.1f}%")
-            c5.metric("ROE", f"{d.get('roe',0)*100:.1f}%")
-            c6.metric("毛利率", f"{d.get('gp',0)*100:.1f}%")
-            pe = d.get('p',0) / max(d.get('eps',0.01), 0.01)
-            c7.metric("本益比", f"{pe:.1f}x")
+with st.spinner(f"🔄 分析 {code_input} 資料中..."):
+d = get_deep_analysis_data(code_input)
 
-            st.markdown(" ")
+if d:
+st.title(f"📊 {d.get('name', code_input)} ({code_input})")
 
-            # 第2列
-            f1,f2,f3,f4,f5,f6,f7 = st.columns(7)
-            f1.metric("營業利益率", f"{d.get('op',0)*100:.1f}%")
-            f2.metric("負債比率", f"{d.get('debt',0)*100:.1f}%")
-            f3.metric("EPS", f"{d.get('eps',0):.2f}")
-            f4.metric("現金流", f"{d.get('fcf',0):.1f}億")
-            f5.metric("營收成長", f"{d.get('rev',0)*100:.1f}%")
-            f6.metric("殖利率", f"{d.get('div',0)*100:.1f}%")
-            rsi_val = d.get('df', pd.DataFrame()).get('RSI', pd.Series([50])).iloc[-1] if not d.get('df', pd.DataFrame()).empty else 50
-            f7.metric("RSI", f"{rsi_val:.0f}")
+# ========== 一、基本面（公司賺不賺錢）==========
+st.header("📌 一、基本面：公司賺不賺錢")
+with st.container(border=True):
+# 盈利能力
+st.subheader("盈利能力")
+c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
+c1.metric("毛利率", f"{d.get('gross_profit', 0) * 100:.1f}%")
+c2.metric("淨利率", f"{d.get('net_margin', 0) * 100:.1f}%")
+c3.metric("營業利益率", f"{d.get('op_margin', 0) * 100:.1f}%")
+c4.metric("EPS", f"{d.get('eps', 0):.2f}")
+c5.metric("ROE", f"{d.get('roe', 0) * 100:.1f}%")
+c6.metric("ROA", f"{d.get('roa', 0) * 100:.1f}%")
 
-            st.markdown(" ")
+# 成長性
+st.subheader("成長性")
+g1, g2, g3 = st.columns(3)
+g1.metric("營收成長率", f"{d.get('rev_growth', 0) * 100:.1f}%")
+g2.metric("EPS 成長率", f"{d.get('eps_growth', 0) * 100:.1f}%")
+g3.metric("淨利成長率", f"{d.get('net_income_growth', 0) * 100:.1f}%")
 
-            # 第3列
-            s1,s2,s3,s4,s5,s6,s7 = st.columns(7)
-            info = d.get('info', {})
-            s1.metric("流動比率", f"{info.get('currentRatio','N/A')}")
-            s2.metric("速動比率", f"{info.get('quickRatio','N/A')}")
-            s3.metric("淨利率", f"{info.get('profitMargins',0)*100:.1f}%")
-            s4.metric("盈餘成長", f"{info.get('earningsGrowth',0)*100:.1f}%")
-            s5.metric("前瞻P/E", f"{info.get('forwardPE','N/A')}")
-            s6.metric("P/B", f"{info.get('priceToBook',0):.1f}x")
-            s7.metric("PEG", f"{info.get('pegRatio','N/A')}")
+# 財務結構
+st.subheader("財務結構")
+f1, f2, f3, f4 = st.columns(4)
+f1.metric("負債比率", f"{d.get('debt_ratio', 0) * 100:.1f}%")
+f2.metric("負債／股東權益", f"{d.get('debt_to_equity', 0) * 100:.1f}%")
+f3.metric("流動比率", f"{d.get('current_ratio', 0):.2f}")
+f4.metric("速動比率", f"{d.get('quick_ratio', 0):.2f}")
 
-        # 第二部分：技術面（修正）
-        st.markdown(" ")
-        st.header("📉 第二部分：股價走勢與動能分析")
-        df = d.get('df', pd.DataFrame())
-        if not df.empty:
-            latest = df.iloc[-1]
-            price = d.get('p', 0)
-            
-            with st.container(border=True):
-                t1, t2, t3, t4 = st.columns(4)
-                with t1:
-                    st.write("**【 均線系統 】**")
-                    ma20 = latest.get('MA20', price)
-                    st.write(f"MA20: {round(ma20, 1)}")
-                    bias = (price / ma20 - 1) * 100 if ma20 > 0 else 0
-                    st.write(f"乖離: {round(bias, 1)}%")
-                with t2:
-                    st.write("**【 量能強弱 】**")
-                    st.write(f"成交: {int(latest.get('Volume',0)/1000)}張")
-                    st.write(f"RSI: {round(latest.get('RSI',50), 1)}")
-                with t3:
-                    k, dv = latest.get('stoch',50), latest.get('stochd',50)
-                    st.write("**【 動能指標 】**")
-                    st.write(f"KD: K{round(k,1)} / D{round(dv,1)}")
-                    st.write(f"{'🔥金叉' if k>dv else '❄️死叉'}")
-                with t4:
-                    st.write("**【 趨勢判定 】**")
-                    trend = "🌕 強勢" if price > ma20 else "🌑 弱勢"
-                    advice = "持股續抱" if price > ma20 else "等待轉強"
-                    st.write(trend)
-                    st.write(advice)
-        else:
-            st.warning("⚠️ 無法取得技術面數據")
+# 現金流品質
+st.subheader("現金流品質")
+c1, c2, c3 = st.columns(3)
+c1.metric("營業現金流", f"{d.get('operating_cashflow', 0) / 1e8:.1f}億")
+c2.metric("自由現金流 (FCF)", f"{d.get('free_cashflow', 0) / 1e8:.1f}億")
+c3.metric("現金流／淨利", f"{d.get('cashflow_profit_ratio', 0):.2f}")
 
-        # 第三部分：AI診斷
-        st.markdown(" ")
-        st.header("🤖 第三部分：AI 終極戰情診斷")
-        api_status = st.secrets.get("GEMINI_API_KEY", "")
-        col1, col2 = st.columns([1, 4])
-        with col1:
-            status_icon = "🟢 已連線" if api_status else "🔴 未連線"
-            st.caption(f"**{status_icon}**")
-        with col2:
-            st.caption(f"**Gemini 2.5 Flash**")
-        
-        if st.button("🚀 啟動 AI 深度診斷", type="primary", use_container_width=True):
-            if api_status:
-                with st.spinner(f"🤖 AI 分析 {d['name']}..."):
-                    report = get_ai_analysis_report(d, code_input, api_status)
-                    st.markdown("### 📋 **AI 終極投資報告**")
-                    st.markdown("---")
-                    st.markdown(report)
-                    st.balloons()
-                    st.success("✅ AI診斷完成！")
-            else:
-                st.error("🔧 **設定Cloud Secrets**：App Settings → Secrets → GEMINI_API_KEY")
-    else:
-        st.error("❌ 請確認股票代碼（如2330、2317），支援 .TW 和 .TWO")
+# 估值水準
+st.subheader("估值水準")
+v1, v2, v3, v4 = st.columns(4)
+v1.metric("本益比 (P/E)", f"{d.get('pe', 0):.1f}x")
+v2.metric("股價淨值比 (P/B)", f"{d.get('pb', 0):.1f}x")
+v3.metric("PEG", f"{d.get('peg', 0):.1f}")
+v4.metric("股利殖利率", f"{d.get('dividend_yield', 0) * 100:.1f}%")
+
+
+# ========== 二、技術面（趨勢、動能、波動、量價）==========
+st.header("📉 二、技術面：股價趨勢與強度")
+df = d.get("df", pd.DataFrame())
+if not df.empty:
+latest = df.iloc[-1]
+price = d.get("price", 0)
+
+with st.container(border=True):
+t1, t2, t3, t4 = st.columns(4)
+
+# 趨勢與均線
+t1.subheader("趨勢與均線")
+t1.write(f"MA5: {latest.get('ma5', price):.1f}")
+t1.write(f"MA20: {latest.get('ma20', price):.1f}")
+t1.write(f"MA60: {latest.get('ma60', price):.1f}")
+t1.write(f"乖離率: {d.get('bias', 0):.1f}%")
+
+# 動能與強度
+t2.subheader("動能與強度")
+t2.write(f"RSI: {d.get('rsi', 50):.1f}")
+t2.write(f"MACD 本體: {latest['macd'] if 'macd' in latest else 0:+.2f}")
+t2.write(f"MACD 信號線: {latest['macd_signal'] if 'macd_signal' in latest else 0:+.2f}")
+
+# 波動與區間
+t3.subheader("波動與區間")
+t3.write(f"布林上: {d.get('bb_upper', 0):.1f}")
+t3.write(f"布林中: {d.get('bb_mid', 0):.1f}")
+t3.write(f"布林下: {d.get('bb_lower', 0):.1f}")
+t3.write(f"52週高價: {d.get('52高', 0):.1f}")
+t3.write(f"52週低價: {d.get('52低', 0):.1f}")
+t3.write(f"標準差 (20日): {df['std'].iloc[-1]:.2f}")
+t3.write(f"ATR (14日): {d.get('atr', 0):.2f}")
+
+# 成交量與量價關係
+t4.subheader("成交量與量價關係")
+t4.write(f"今日成交量: {int(latest['Volume'] / 1000):,} 張")
+t4.write(f"量價：{('價漲量增' if latest['Close'] > latest['Close'].shift(1) and latest['Volume'] > latest['Volume'].shift(1) else '價漲量縮')}")
+
+# 可選：OBV / MFI（若你有實作，可加 Metrics）
+
+
+# ========== 三、財務與資本結構（公司資本是否健康）==========
+st.header("🏦 三、財務與資本結構：公司資本是否健康")
+with st.container(border=True):
+s1, s2, s3 = st.columns(3)
+s1.metric("總資產", f"{d.get('total_assets', 0) / 1e9:.1f} 億")
+s2.metric("總負債", f"{d.get('total_liabilities', 0) / 1e9:.1f} 億")
+s3.metric("股東權益", f"{d.get('equity', 0) / 1e9:.1f} 億")
+
+r1, r2 = st.columns(2)
+r1.metric("資本支出 (Capex)", f"{d.get('capex', 0) / 1e8:.1f} 億")
+r2.metric("資本支出／營業現金流", f"{d.get('capex_to_cashflow', 0):.2f}")
+
+
+# ========== 四、現金流與股利（現金能不能穩定入袋）==========
+st.header("💵 四、現金流與股利：現金能不能穩定入袋")
+with st.container(border=True):
+f1, f2, f3, f4 = st.columns(4)
+f1.metric("自由現金流／營收", f"{d.get('fcf_revenue_ratio', 0):.1%}")
+f2.metric("自由現金流／股價", f"{d.get('fcf_price_ratio', 0):.1%}")
+f3.metric("FCF 成長率", f"{d.get('fcf_growth', 0) * 100:.1f}%")
+f4.metric("盈餘配發率", f"{d.get('payout_ratio', 0) * 100:.1f}%")
+
+st.write("說明：")
+st.write("• 若「自由現金流／股價」為正，表示每單位股價背後有實質現金支撐。")
+st.write("• 若「盈餘配發率」接近 100%，代表公司多數盈餘用於配股，現金流留存較少。")
+
+
+# ========== 五、第三代：AI 終極戰情診斷（保留你的第三部分）==========
+st.markdown("---")
+st.header("🤖 五、第三代：AI 終極戰情診斷")
+
+api_status = st.secrets.get("GEMINI_API_KEY", "")
+col1, col2 = st.columns([1, 4])
+with col1:
+status_icon = "🟢 已連線" if api_status else "🔴 未連線"
+st.caption(f"**{status_icon}**")
+with col2:
+st.caption(f"**Gemini 2.5 Flash**")
+
+if st.button("🚀 啟動 AI 深度診斷", type="primary", use_container_width=True):
+if api_status:
+with st.spinner(f"🤖 AI 分析 {d['name']}..."):
+report = get_ai_analysis_report(d, code_input, api_status)
+st.markdown("### 📋 **AI 終極投資報告**")
+st.markdown("---")
+st.markdown(report)
+st.balloons()
+st.success("✅ AI 診斷完成！")
+else:
+st.error("🔧 請先在 Streamlit Cloud 設定 Secrets：App Settings → Secrets → GEMINI_API_KEY")
+else:
+st.error("❌ 請確認輸入正確的股票代碼（例如 2330、2317）")
