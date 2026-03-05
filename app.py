@@ -314,7 +314,7 @@ st.markdown("""
 /* 2. 小標題：盈利能力、成長性、財務結構、現金流品質、估值水準、趨勢與均線、動能與強度、波動與區間、成交量與量價關係 */
 /* 這些都是 st.subheader，會變成 h2 */
 h2 {
-    color: #00B7FF !important;          /* 橘色，可改為 #27AE60（綠）、#34495E（深灰） */
+    color: red !important;          /* 橘色，可改為 #27AE60（綠）、#34495E（深灰） */
     font-size: 1.4rem !important;
     margin-top: 0.5rem !important;
     margin-bottom: 0.2rem !important;
@@ -587,6 +587,7 @@ if code_input:
                 st.error("🔧 請先在 Streamlit Cloud 設定 Secrets：App Settings → Secrets → GEMINI_API_KEY")
     else:
         st.write("✅ 這是 Ray 的最新台股深度分析版本")
+
 
 
 
