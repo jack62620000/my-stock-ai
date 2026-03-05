@@ -403,22 +403,6 @@ if code_input:
                     volume_trend = "價漲量縮"
             r6.metric("盤中量價", volume_trend)
 
-
-        st.markdown(
-            """
-            <style>
-            /* 縮小 subheader 與 metrics 的間距 */
-            .stSubheader {
-                 margin-bottom: 0.1rem;
-            }
-            /* 讓 metrics 之間緊一點 */
-            .stMetric, .stMetricLabel, .stMetricValue {
-                margin: 0.1rem 0 0.1rem 0;
-            }
-            </style>
-            """,
-            unsafe_allow_html=True
-        )
 #  ========== 一、基本面（公司賺不賺錢）==========
         st.header("📌 一、基本面：公司賺不賺錢")
         with st.container(border=True):
@@ -585,6 +569,7 @@ if code_input:
                 st.error("🔧 請先在 Streamlit Cloud 設定 Secrets：App Settings → Secrets → GEMINI_API_KEY")
     else:
         st.error("❌ 請確認輸入正確的股票代碼（例如 2330、2317）")
+
 
 
 
