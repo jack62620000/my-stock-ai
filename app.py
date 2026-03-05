@@ -63,6 +63,7 @@ st.sidebar.markdown("---")
 
 # --- 2. 核心資料與指標計算 ---
 @st.cache_data(ttl=300)
+@st.cache_data(ttl=86400)
 def get_deep_analysis_data(code):
     for suffix in [".TW", ".TWO"]:
         try:
@@ -98,29 +99,84 @@ def get_deep_analysis_data(code):
                 revenue = financials.loc["Total Revenue"] if "Total Revenue" in financials.index else pd.Series([np.nan])
                 net_income = income.iloc[0] if not income.empty and not pd.isna(income.iloc[0]) else np.nan
                 net_rev = revenue.iloc[0] if not revenue.empty and not pd.isna(revenue.iloc[0]) else np.nan
-            except:
+
+                # ----- 新增：毛利、營業利益成長率（年增） -----
+                if "Gross Profit" in financials.index:
+                    gp = financials.loc["Gross Profit"]
+                    if len(gp) >= 2:
+                        gross_profit_growth = (gp.iloc[0] - gp.iloc[1]) / gp.iloc[1]
+                    else:
+                        gross_profit_growth = np.nan
+                else:
+                    gross_profit_growth = np.nan
+
+                if "Operating Income" in financials.index:
+                    oi = financials.loc["Operating Income"]
+                    if len(oi) >= 2:
+                        operating_income_growth = (oi.iloc[0] - oi.iloc[1]) / oi.iloc[1]
+                    else:
+                        operating_income_growth = np.nan
+                else:
+                    operating_income_growth = np.nan
+            except Exception:
                 net_income = np.nan
                 net_rev = np.nan
+                gross_profit_growth = np.nan
+                operating_income_growth = np.nan
 
             try:
                 balance_sheet = ticker.balance_sheet
                 total_assets = balance_sheet.loc["Total Assets"].iloc[0] if "Total Assets" in balance_sheet.index else np.nan
                 total_liabilities = balance_sheet.loc["Total Liabilities Net Minority Interest"].iloc[0] if "Total Liabilities Net Minority Interest" in balance_sheet.index else np.nan
                 equity = balance_sheet.loc["Total Equity Gross Minority Interest"].iloc[0] if "Total Equity Gross Minority Interest" in balance_sheet.index else np.nan
-            except:
+
+                # 存貨、現金、非流動負債（用來算結構比）
+                inventory = balance_sheet.loc["Total Inventory"].iloc[0] if "Total Inventory" in balance_sheet.index else np.nan
+                cash = balance_sheet.loc["Cash And Cash Equivalents"].iloc[0] if "Cash And Cash Equivalents" in balance_sheet.index else np.nan
+                non_current_liabilities = balance_sheet.loc["Non-Current Liabilities"].iloc[0] if "Non-Current Liabilities" in balance_sheet.index else np.nan
+
+                # ----- 新增：資產成長率、權益成長率、結構比 -----
+                assets_growth = np.nan
+                equity_growth = np.nan
+                if "Total Assets" in balance_sheet.index:
+                    assets = balance_sheet.loc["Total Assets"]
+                    if len(assets) >= 2:
+                        assets_growth = (assets.iloc[0] - assets.iloc[1]) / assets.iloc[1]
+
+                if "Total Equity Gross Minority Interest" in balance_sheet.index:
+                    eq = balance_sheet.loc["Total Equity Gross Minority Interest"]
+                    if len(eq) >= 2:
+                        equity_growth = (eq.iloc[0] - eq.iloc[1]) / eq.iloc[1]
+
+                # 結構比：存貨、現金、非流動負債占資產或負債比
+                inv_asset_ratio = inventory / total_assets if total_assets and not pd.isna(inventory) else np.nan
+                cash_asset_ratio = cash / total_assets if total_assets and not pd.isna(cash) else np.nan
+                ncd_liabilities_ratio = non_current_liabilities / total_liabilities if total_liabilities and not pd.isna(non_current_liabilities) else np.nan
+            except Exception:
                 total_assets = np.nan
                 total_liabilities = np.nan
                 equity = np.nan
+                inventory = np.nan
+                cash = np.nan
+                non_current_liabilities = np.nan
+                inv_asset_ratio = np.nan
+                cash_asset_ratio = np.nan
+                ncd_liabilities_ratio = np.nan
+                assets_growth = np.nan
+                equity_growth = np.nan
 
             try:
                 cashflow = ticker.cashflow
                 operating_cashflow = cashflow.loc["Operating Cash Flow"].iloc[0] if "Operating Cash Flow" in cashflow.index else np.nan
                 capex = -cashflow.loc["Capital Expenditure"].iloc[0] if "Capital Expenditure" in cashflow.index else 0.0
                 free_cashflow = operating_cashflow - capex
-            except:
+
+                capex_to_cashflow = capex / operating_cashflow if operating_cashflow else np.nan
+            except Exception:
                 operating_cashflow = np.nan
                 capex = np.nan
                 free_cashflow = np.nan
+                capex_to_cashflow = np.nan
 
             # 基本面指標計算
             debt_ratio = total_liabilities / total_assets if total_assets else np.nan
@@ -130,6 +186,11 @@ def get_deep_analysis_data(code):
             fcf_price_ratio = free_cashflow / (price * 1e8) if price and free_cashflow else np.nan
             fcf_growth = eps_growth  # 用盈餘成長率近似 FCF 成長
 
+            # ----- 新增：現金股利報酬率、帳面價值成長率（BVG） -----
+            div_per_share = info.get("dividendRate", np.nan)
+            cash_dividend_yield = div_per_share / price if price and div_per_share else np.nan
+            book_value_growth = equity_growth  # 帳面價值成長率 = 權益成長率
+
             # 技術面指標（基於歷史股價）
             df = hist.copy()
             df["ma5"] = ta.sma(df["Close"], 5)
@@ -137,7 +198,8 @@ def get_deep_analysis_data(code):
             df["ma60"] = ta.sma(df["Close"], 60)
             df["偏差"] = (df["Close"] - df["ma20"]) / df["ma20"]
             df["rsi"] = ta.rsi(df["Close"], 14)
-            # 技術面指標：MACD 安全寫法
+
+            # MACD 安全寫法
             try:
                 macd_df = ta.macd(df["Close"])
                 if isinstance(macd_df, pd.DataFrame) and not macd_df.empty:
@@ -149,6 +211,7 @@ def get_deep_analysis_data(code):
             except Exception as e:
                 df["macd"] = np.nan
                 df["macd_signal"] = np.nan
+
             df["布林上"], df["布林中"], df["布林下"] = ta.bbands(df["Close"]).iloc[:, 0], ta.bbands(df["Close"]).iloc[:, 1], ta.bbands(df["Close"]).iloc[:, 2]
             df["52高"] = df["High"].max()
             df["52低"] = df["Low"].min()
@@ -211,17 +274,31 @@ def get_deep_analysis_data(code):
                 "total_liabilities": total_liabilities,
                 "equity": equity,
                 "capex": capex,
-                "capex_to_cashflow": capex / operating_cashflow if operating_cashflow else np.nan,
+                "capex_to_cashflow": capex_to_cashflow,
 
-                # 現金流與股利
+                # 成長性（新增）
+                "gross_profit_growth": gross_profit_growth,
+                "operating_income_growth": operating_income_growth,
+                "assets_growth": assets_growth,
+                "equity_growth": equity_growth,
+
+                # 財務結構（結構比）
+                "inv_asset_ratio": inv_asset_ratio,
+                "cash_asset_ratio": cash_asset_ratio,
+                "ncd_liabilities_ratio": ncd_liabilities_ratio,
+
+                # 現金流與股利（新增）
                 "fcf_revenue_ratio": fcf_revenue_ratio,
                 "fcf_price_ratio": fcf_price_ratio,
                 "fcf_growth": fcf_growth,
+                "cash_dividend_yield": cash_dividend_yield,
+                "book_value_growth": book_value_growth,
             }
         except Exception as e:
             st.warning(f"代碼 {code}{suffix} 錯誤：{e}")
             continue
     return None
+
 
 # --- 3. AI 會話（保留第三部分）---
 @st.cache_data(ttl=86400)
@@ -426,6 +503,7 @@ if code_input:
                 st.error("🔧 請先在 Streamlit Cloud 設定 Secrets：App Settings → Secrets → GEMINI_API_KEY")
     else:
         st.error("❌ 請確認輸入正確的股票代碼（例如 2330、2317）")
+
 
 
 
