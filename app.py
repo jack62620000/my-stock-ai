@@ -460,7 +460,7 @@ if code_input:
             s2.metric("總負債", f"{d.get('total_liabilities', 0) / 1e9:.1f} 億")
             s3.metric("股東權益", f"{d.get('equity', 0) / 1e9:.1f} 億")
 
-            r1, r2 = st.columns(2)
+            r1, r2 , r3 = st.columns(3)
             r1.metric("資本支出 (Capex)", f"{d.get('capex', 0) / 1e8:.1f} 億")
             r2.metric("資本支出／營業現金流", f"{d.get('capex_to_cashflow', 0):.2f}")
 
@@ -504,6 +504,7 @@ if code_input:
                 st.error("🔧 請先在 Streamlit Cloud 設定 Secrets：App Settings → Secrets → GEMINI_API_KEY")
     else:
         st.error("❌ 請確認輸入正確的股票代碼（例如 2330、2317）")
+
 
 
 
