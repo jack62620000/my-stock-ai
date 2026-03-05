@@ -345,7 +345,17 @@ if code_input:
                 # 成交量與量價關係
                 t4.subheader("成交量與量價關係")
                 t4.write(f"今日成交量: {int(latest['Volume'] / 1000):,} 張")
-                t4.write(f"量價：{('價漲量增' if latest['Close'] > latest['Close'].shift(1) and latest['Volume'] > latest['Volume'].shift(1) else '價漲量縮')}")
+
+                if len(df) >= 2:
+                    prev = df.iloc[-2]
+                    if latest['Close'] > prev['Close'] and latest['Volume'] > prev['Volume']:
+                        volume_msg = "價漲量增"
+                    else:
+                        volume_msg = "價漲量縮"
+                else:
+                    volume_msg = "價量資訊不足"
+
+                t4.write(f"量價：{volume_msg}")
 
                 # 可選：OBV / MFI（若你有實作，可加 Metrics）
 
@@ -402,6 +412,7 @@ if code_input:
                 st.error("🔧 請先在 Streamlit Cloud 設定 Secrets：App Settings → Secrets → GEMINI_API_KEY")
     else:
         st.error("❌ 請確認輸入正確的股票代碼（例如 2330、2317）")
+
 
 
 
