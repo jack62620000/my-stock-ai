@@ -314,8 +314,8 @@ h1 {
     margin-bottom: 0.5rem !important; 
 }
 h2, h3 { 
-    font-size: 1.6rem !important; 
-    margin: 0.2rem 0 0.3rem 0 !important; 
+    color: red !important;
+    font-size: 1.8rem !important;
 }
 
 /* metric 區 */
@@ -571,5 +571,6 @@ if code_input:
                 st.error("🔧 請先在 Streamlit Cloud 設定 Secrets：App Settings → Secrets → GEMINI_API_KEY")
     else:
         st.write("✅ 這是 Ray 的最新台股深度分析版本")
+
 
 
