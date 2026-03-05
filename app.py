@@ -13,7 +13,7 @@ h1 { font-size: 1.8rem !important; margin-bottom: 0.5rem !important; }
 h2, h3 { font-size: 1.6rem !important; margin: 0.2rem 0 0.3rem 0.3 !important; }
 
 .stHeader {
-        margin-bottom: 0.2rem !important;
+        margin-bottom: 0.1rem !important;
     }
 /* 容器內文字統一 */
 .metric-container { 
@@ -576,6 +576,7 @@ if code_input:
                 st.error("🔧 請先在 Streamlit Cloud 設定 Secrets：App Settings → Secrets → GEMINI_API_KEY")
     else:
         st.error("❌ 請確認輸入正確的股票代碼（例如 2330、2317）")
+
 
 
 
