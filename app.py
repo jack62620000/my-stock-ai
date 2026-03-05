@@ -344,44 +344,36 @@ if code_input:
             st.title(f"📊 {d.get('name', code_input)} ({code_input})")
 
         with col2:
-            st.markdown("### 📊 盤中即時趨勢")
+    # 不用任何標題，只放 metrics
+    t1, t2, t3, t4, t5, t6 = st.columns(6)
+    t1.metric("即時股價", f"{price:.1f}")
+    t2.metric("漲跌額", f"{change_price:+.1f}")
+    t3.metric("漲跌幅", f"{change_percent:+.1f}%")
 
-            # 用你已經有的 price、hist 來算即時價與變化
-            price = d.get("price", 0)
-            hist = ticker.history(period="1y") if "ticker" in locals() else None
-            prev_close = hist["Close"].iloc[-2] if hist is not None and len(hist) >= 2 else price
-            change_price = price - prev_close
-            change_percent = change_price / prev_close * 100 if prev_close else 0
+    if not hist.empty:
+        t4.metric("今日開盤", f"{hist['Open'].iloc[-1]:.1f}")
+        t5.metric("今日高點", f"{hist['High'].iloc[-1]:.1f}")
+        t6.metric("今日低點", f"{hist['Low'].iloc[-1]:.1f}")
 
-            t1, t2, t3, t4, t5, t6 = st.columns(6)
-            t1.metric("即時股價", f"{price:.1f}")
-            t2.metric("漲跌額", f"{change_price:+.1f}")
-            t3.metric("漲跌幅", f"{change_percent:+.1f}%")
+    st.markdown("---", unsafe_allow_html=True)
 
-            if not hist.empty:
-                t4.metric("今日開盤", f"{hist['Open'].iloc[-1]:.1f}")
-                t5.metric("今日高點", f"{hist['High'].iloc[-1]:.1f}")
-                t6.metric("今日低點", f"{hist['Low'].iloc[-1]:.1f}")
+    rsi_now = d.get("rsi", 50)
+    rsi_trend = "偏高" if rsi_now > 70 \
+                else "偏低" if rsi_now < 30 \
+                else "中間"
 
-            st.markdown("---")
+    macd_line = d.get("df", pd.DataFrame()).get("macd").iloc[-1] if "macd" in d.get("df", pd.DataFrame()).columns else 0.0
+    macd_signal = d.get("df", pd.DataFrame()).get("macd_signal").iloc[-1] if "macd_signal" in d.get("df", pd.DataFrame()).columns else 0.0
+    macd_trend = "金叉" if macd_line > macd_signal and macd_line > 0 \
+                 else "死叉" if macd_line < macd_signal and macd_line < 0 \
+                 else "震盪"
 
-            rsi_now = d.get("rsi", 50)
-            rsi_trend = "偏高" if rsi_now > 70 \
-                        else "偏低" if rsi_now < 30 \
-                        else "中間"
-
-            macd_line = d.get("df", pd.DataFrame()).get("macd").iloc[-1] if "macd" in d.get("df", pd.DataFrame()).columns else 0.0
-            macd_signal = d.get("df", pd.DataFrame()).get("macd_signal").iloc[-1] if "macd_signal" in d.get("df", pd.DataFrame()).columns else 0.0
-            macd_trend = "金叉" if macd_line > macd_signal and macd_line > 0 \
-                         else "死叉" if macd_line < macd_signal and macd_line < 0 \
-                         else "震盪"
-
-            t1.metric("RSI 趨勢", rsi_trend)
-            t2.metric("即時 RSI", f"{rsi_now:.1f}")
-            t3.metric("即時 MACD", f"{macd_line:+.2f}")
-            t4.metric("MACD 信號線", f"{macd_signal:+.2f}")
-            t5.metric("成交量 (張)", f"{int(d.get('df', pd.DataFrame())['Volume'].iloc[-1] / 1000):,}")
-            t6.metric("盤中量價", "價漲量增" if price > prev_close and d.get('df')['Volume'].iloc[-1] > d.get('df')['Volume'].iloc[-2] and len(d.get('df'))>=2 else "價漲量縮")
+    t1.metric("RSI 趨勢", rsi_trend)
+    t2.metric("即時 RSI", f"{rsi_now:.1f}")
+    t3.metric("即時 MACD", f"{macd_line:+.2f}")
+    t4.metric("MACD 信號線", f"{macd_signal:+.2f}")
+    t5.metric("成交量 (張)", f"{int(d.get('df', pd.DataFrame())['Volume'].iloc[-1] / 1000):,}")
+    t6.metric("盤中量價", "價漲量增" if price > prev_close and d.get('df')['Volume'].iloc[-1] > d.get('df')['Volume'].iloc[-2] and len(d.get('df'))>=2 else "價漲量縮")
 
         st.markdown(
             """
@@ -564,6 +556,7 @@ if code_input:
                 st.error("🔧 請先在 Streamlit Cloud 設定 Secrets：App Settings → Secrets → GEMINI_API_KEY")
     else:
         st.error("❌ 請確認輸入正確的股票代碼（例如 2330、2317）")
+
 
 
 
