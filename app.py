@@ -358,10 +358,10 @@ if code_input:
             g1.metric("營收成長率", f"{d.get('rev_growth', 0) * 100:.1f}%")
             g2.metric("EPS 成長率", f"{d.get('eps_growth', 0) * 100:.1f}%")
             g3.metric("淨利成長率", f"{d.get('net_income_growth', 0) * 100:.1f}%")
-            g4.metric("毛利成長率", f"{gross_profit_growth * 100:.1f}%")
-            g5.metric("營業利益成長率", f"{op_income_growth * 100:.1f}%")
-            g6.metric("資產成長率", f"{assets_growth * 100:.1f}%")
-            g7.metric("權益成長率", f"{equity_growth * 100:.1f}%")
+            g4.metric("毛利成長率", f"{d.get('gross_profit_growth', 0) * 100:.1f}%")
+            g5.metric("營業利益成長率", f"{d.get('operating_income_growth', 0) * 100:.1f}%")
+            g6.metric("資產成長率", f"{d.get('assets_growth', 0) * 100:.1f}%")
+            g7.metric("權益成長率", f"{d.get('equity_growth', 0) * 100:.1f}%")
 
             # 財務結構
             st.subheader("財務結構")
@@ -393,7 +393,8 @@ if code_input:
             v3.metric("PEG", f"{d.get('peg', 0):.1f}")
             v4.metric("股利殖利率", f"{d.get('dividend_yield', 0) * 100:.1f}%")
             v5.metric("盈餘配發率", f"{d.get('payout_ratio', 0) * 100:.1f}%")
-            v6.metric("帳面價值成長率", f"{equity_growth * 100:.1f}%")
+            v6.metric("現金股利報酬率", f"{d.get('cash_dividend_yield', 0) * 100:.1f}%")
+            v7.metric("帳面價值成長率", f"{d.get('book_value_growth', 0) * 100:.1f}%")
             
 
         #  ========== 二、技術面（趨勢、動能、波動、量價）==========
@@ -503,6 +504,7 @@ if code_input:
                 st.error("🔧 請先在 Streamlit Cloud 設定 Secrets：App Settings → Secrets → GEMINI_API_KEY")
     else:
         st.error("❌ 請確認輸入正確的股票代碼（例如 2330、2317）")
+
 
 
 
