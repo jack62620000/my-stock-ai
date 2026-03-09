@@ -36,163 +36,44 @@ def render_overview(d, code_input):
     fair_price = calc_fair_price(d)
     margin = calc_margin_of_safety(d)
 
-    st.markdown(
-        """
-        <style>
-        .quote-card {
-            background: #ffffff;
-            border: 1px solid #e8e8e8;
-            border-radius: 14px;
-            padding: 16px 18px;
-            margin-bottom: 14px;
-        }
-        .quote-title {
-            font-size: 1.75rem;
-            font-weight: 700;
-            color: #222;
-            margin-bottom: 10px;
-        }
-        .quote-grid {
-            display: grid;
-            grid-template-columns: repeat(7, minmax(90px, 1fr));
-            gap: 12px 16px;
-            margin-top: 8px;
-            margin-bottom: 6px;
-        }
-        .quote-item {
-            padding: 4px 0;
-        }
-        .quote-label {
-            font-size: 0.96rem;
-            color: #666;
-            margin-bottom: 4px;
-        }
-        .quote-value {
-            font-size: 1.55rem;
-            font-weight: 700;
-            color: #111;
-            line-height: 1.2;
-        }
-        .ma-grid {
-            display: grid;
-            grid-template-columns: repeat(6, minmax(90px, 1fr));
-            gap: 10px 16px;
-            margin-top: 12px;
-            padding-top: 12px;
-            border-top: 1px solid #f0f0f0;
-        }
-        .ma-item {
-            font-size: 1.08rem;
-            color: #222;
-            line-height: 1.35;
-            font-weight: 600;
-        }
-        .ma-label {
-            color: #777;
-            font-size: 0.90rem;
-            display: block;
-            margin-bottom: 2px;
-            font-weight: 400;
-        }
-        .mini-metrics {
-            display: grid;
-            grid-template-columns: repeat(4, minmax(90px, 1fr));
-            gap: 10px 14px;
-            margin-bottom: 14px;
-        }
-        .mini-card {
-            background: #ffffff;
-            border: 1px solid #e8e8e8;
-            border-radius: 12px;
-            padding: 10px 14px;
-        }
-        .mini-label {
-            font-size: 0.88rem;
-            color: #666;
-        }
-        .mini-value {
-            font-size: 1.20rem;
-            font-weight: 700;
-            color: #111;
-            margin-top: 2px;
-        }
-        .toolbar-wrap {
-            background: #ffffff;
-            border: 1px solid #e8e8e8;
-            border-radius: 12px;
-            padding: 10px 14px 2px 14px;
-            margin: 10px 0 14px 0;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    # ===== 上方摘要小卡 =====
-    summary_html = f"""
-    <div class="mini-metrics">
-        <div class="mini-card">
-            <div class="mini-label">即時股價</div>
-            <div class="mini-value">{_fmt_num(price, 1)}</div>
-        </div>
-        <div class="mini-card">
-            <div class="mini-label">漲跌額</div>
-            <div class="mini-value">{_fmt_num(d.get('price_change_amount', 0), 1)}</div>
-        </div>
-        <div class="mini-card">
-            <div class="mini-label">漲跌幅</div>
-            <div class="mini-value">{_fmt_num(d.get('price_change', 0), 1, '%')}</div>
-        </div>
-        <div class="mini-card">
-            <div class="mini-label">52週位置</div>
-            <div class="mini-value">{_fmt_num(position_52 * 100, 1, '%') if pd.notna(position_52) else 'N/A'}</div>
-        </div>
-        <div class="mini-card">
-            <div class="mini-label">EPS</div>
-            <div class="mini-value">{_fmt_num(d.get('eps'), 2)}</div>
-        </div>
-        <div class="mini-card">
-            <div class="mini-label">本益比(P/E)</div>
-            <div class="mini-value">{_fmt_num(d.get('pe'), 1, 'x')}</div>
-        </div>
-        <div class="mini-card">
-            <div class="mini-label">估算合理價</div>
-            <div class="mini-value">{_fmt_num(fair_price, 1)}</div>
-        </div>
-        <div class="mini-card">
-            <div class="mini-label">安全邊際</div>
-            <div class="mini-value">{_fmt_num(margin * 100, 1, '%') if pd.notna(margin) else 'N/A'}</div>
-        </div>
-    </div>
-    """
-    st.markdown(summary_html, unsafe_allow_html=True)
-
     if df.empty:
         st.warning("沒有K線資料")
         return
 
-    # ===== 切換列（只保留這一組） =====
-    toolbar_left, toolbar_right = st.columns([2, 2])
+    # ===== 上方摘要 =====
+    top1, top2, top3, top4 = st.columns(4)
+    top1.metric("即時股價", f"{price:.1f}")
+    top2.metric("漲跌額", f"{d.get('price_change_amount', 0):+.1f}")
+    top3.metric("漲跌幅", f"{d.get('price_change', 0):+.1f}%")
+    top4.metric("52週位置", f"{position_52 * 100:.1f}%" if pd.notna(position_52) else "N/A")
 
-    with toolbar_left:
+    top5, top6, top7, top8 = st.columns(4)
+    top5.metric("EPS", _fmt_num(d.get("eps"), 2))
+    top6.metric("本益比(P/E)", _fmt_num(d.get("pe"), 1, "x"))
+    top7.metric("估算合理價", _fmt_num(fair_price, 1))
+    top8.metric("安全邊際", _fmt_num(margin * 100, 1, "%") if pd.notna(margin) else "N/A")
+
+    st.divider()
+
+    # ===== 切換列 =====
+    ctl1, ctl2 = st.columns(2)
+    with ctl1:
         period_type = st.radio(
             "K線週期",
             ["日", "週", "月"],
             horizontal=True,
-            index=0,
-            key=f"period_type_toolbar_{code_input}",
+            key=f"period_type_{code_input}",
         )
 
-    with toolbar_right:
+    with ctl2:
         window_size = st.radio(
             "顯示根數",
             [30, 60, 120],
             horizontal=True,
             index=1,
-            key=f"window_size_toolbar_{code_input}",
+            key=f"window_size_{code_input}",
         )
 
-    # ===== 週期轉換 =====
     chart_df = df.copy()
     if period_type == "週":
         chart_df = _resample_ohlcv(chart_df, "W")
@@ -217,7 +98,7 @@ def render_overview(d, code_input):
         st.warning("目前視窗內沒有資料")
         return
 
-    # ===== 報價資訊列 =====
+    # ===== 報價資訊 =====
     last_row = visible_df.iloc[-1]
     open_p = last_row["Open"]
     high_p = last_row["High"]
@@ -235,52 +116,28 @@ def render_overview(d, code_input):
     mv5_val = visible_df["mv5"].iloc[-1] if "mv5" in visible_df.columns else float("nan")
     mv20_val = visible_df["mv20"].iloc[-1] if "mv20" in visible_df.columns else float("nan")
 
-    quote_html = f"""
-    <div class="quote-card">
-        <div class="quote-title">{d.get('name', code_input)} ({code_input})</div>
+    with st.container(border=True):
+        st.subheader(f"{d.get('name', code_input)} ({code_input})")
 
-        <div class="quote-grid">
-            <div class="quote-item">
-                <div class="quote-label">日期</div>
-                <div class="quote-value">{last_row.name.strftime("%Y/%m/%d")}</div>
-            </div>
-            <div class="quote-item">
-                <div class="quote-label">開盤價</div>
-                <div class="quote-value">{_fmt_num(open_p, 0)}</div>
-            </div>
-            <div class="quote-item">
-                <div class="quote-label">最高價</div>
-                <div class="quote-value">{_fmt_num(high_p, 0)}</div>
-            </div>
-            <div class="quote-item">
-                <div class="quote-label">最低價</div>
-                <div class="quote-value">{_fmt_num(low_p, 0)}</div>
-            </div>
-            <div class="quote-item">
-                <div class="quote-label">收盤價</div>
-                <div class="quote-value">{_fmt_num(close_p, 0)}</div>
-            </div>
-            <div class="quote-item">
-                <div class="quote-label">成交量(股)</div>
-                <div class="quote-value">{int(vol):,}</div>
-            </div>
-            <div class="quote-item">
-                <div class="quote-label">漲跌</div>
-                <div class="quote-value">{_fmt_num(change, 0)}</div>
-            </div>
-        </div>
+        q1, q2, q3, q4, q5, q6, q7 = st.columns(7)
+        q1.metric("日期", last_row.name.strftime("%Y/%m/%d"))
+        q2.metric("開盤價", _fmt_num(open_p, 0))
+        q3.metric("最高價", _fmt_num(high_p, 0))
+        q4.metric("最低價", _fmt_num(low_p, 0))
+        q5.metric("收盤價", _fmt_num(close_p, 0))
+        q6.metric("成交量(股)", f"{int(vol):,}")
+        q7.metric("漲跌", _fmt_num(change, 0))
 
-        <div class="ma-grid">
-            <div class="ma-item"><span class="ma-label">MA5</span>{_fmt_num(ma5_val, 1)}</div>
-            <div class="ma-item"><span class="ma-label">MA10</span>{_fmt_num(ma10_val, 1)}</div>
-            <div class="ma-item"><span class="ma-label">MA20</span>{_fmt_num(ma20_val, 1)}</div>
-            <div class="ma-item"><span class="ma-label">MA60</span>{_fmt_num(ma60_val, 1)}</div>
-            <div class="ma-item"><span class="ma-label">MV5</span>{_fmt_num(mv5_val, 1)}</div>
-            <div class="ma-item"><span class="ma-label">MV20</span>{_fmt_num(mv20_val, 1)}</div>
-        </div>
-    </div>
-    """
-    st.markdown(quote_html, unsafe_allow_html=True)
+        st.markdown("##### 均線 / 均量")
+        m1, m2, m3, m4, m5, m6 = st.columns(6)
+        m1.metric("MA5", _fmt_num(ma5_val, 1))
+        m2.metric("MA10", _fmt_num(ma10_val, 1))
+        m3.metric("MA20", _fmt_num(ma20_val, 1))
+        m4.metric("MA60", _fmt_num(ma60_val, 1))
+        m5.metric("MV5", _fmt_num(mv5_val, 1))
+        m6.metric("MV20", _fmt_num(mv20_val, 1))
+
+    st.markdown("")
 
     # ===== 自動Y軸 =====
     visible_high = visible_df["High"].max()
@@ -386,13 +243,13 @@ def render_overview(d, code_input):
 
     fig.update_yaxes(range=[y_min, y_max], row=1, col=1)
 
-    # ===== 左右按鈕在圖左右 =====
-    wrap_left, wrap_center, wrap_right = st.columns([0.9, 6.2, 0.9])
+    # ===== 左右按鈕 =====
+    wrap_left, wrap_center, wrap_right = st.columns([0.8, 6.4, 0.8])
 
     with wrap_left:
         st.write("")
         st.write("")
-        if st.button("⬅ 更早", use_container_width=True, key=f"left_btn_{code_input}_{period_type}_{window_size}"):
+        if st.button("⬅", use_container_width=True, key=f"left_btn_{code_input}_{period_type}_{window_size}"):
             st.session_state[session_key] = max(
                 0,
                 st.session_state.get(session_key, max(len(chart_df) - window_size, 0)) - 10
@@ -412,7 +269,7 @@ def render_overview(d, code_input):
     with wrap_right:
         st.write("")
         st.write("")
-        if st.button("更新 ➡", use_container_width=True, key=f"right_btn_{code_input}_{period_type}_{window_size}"):
+        if st.button("➡", use_container_width=True, key=f"right_btn_{code_input}_{period_type}_{window_size}"):
             st.session_state[session_key] = min(
                 max_start,
                 st.session_state.get(session_key, max(len(chart_df) - window_size, 0)) + 10
