@@ -34,7 +34,6 @@ def render_overview(d, code_input):
     # ===== 固定視窗設定 =====
     window_size = st.session_state.get("chart_window_size", 60)
 
-    # 初始化起始位置：預設看最近一段
     if "chart_start" not in st.session_state:
         st.session_state["chart_start"] = max(len(df) - window_size, 0)
 
@@ -42,7 +41,6 @@ def render_overview(d, code_input):
 
     st.markdown("### 📊 固定視窗 K 線圖")
 
-    # 左右控制按鈕
     btn_left, _, btn_right = st.columns([1.2, 4.6, 1.2])
 
     with btn_left:
@@ -59,14 +57,7 @@ def render_overview(d, code_input):
                 st.session_state.get("chart_start", max(len(df) - window_size, 0)) + 10
             )
 
-    # slider 控制區間
-    start_idx = st.slider(
-        "移動K線視窗",
-        min_value=0,
-        max_value=max_start if max_start > 0 else 0,
-        value=min(st.session_state["chart_start"], max_start),
-        step=1,
-    )
+    start_idx = min(st.session_state["chart_start"], max_start)
     st.session_state["chart_start"] = start_idx
 
     visible_df = df.iloc[start_idx:start_idx + window_size].copy()
@@ -75,7 +66,7 @@ def render_overview(d, code_input):
         st.warning("目前視窗內沒有資料")
         return
 
-    # ===== 自動調整Y軸範圍 =====
+    # ===== 自動調整Y軸 =====
     visible_high = visible_df["High"].max()
     visible_low = visible_df["Low"].min()
     price_padding = (
@@ -87,15 +78,16 @@ def render_overview(d, code_input):
     y_min = visible_low - price_padding
     y_max = visible_high + price_padding
 
-    # ===== 建立K線 + 成交量圖 =====
+    # ===== K線 + 成交量 =====
     fig = make_subplots(
         rows=2,
         cols=1,
         shared_xaxes=True,
         vertical_spacing=0.02,
-        row_heights=[0.85, 0.15],
+        row_heights=[0.86, 0.14],
     )
 
+    # K線
     fig.add_trace(
         go.Candlestick(
             x=visible_df.index,
@@ -104,13 +96,28 @@ def render_overview(d, code_input):
             low=visible_df["Low"],
             close=visible_df["Close"],
             name="K線",
-            increasing_line_width=1.4,
-            decreasing_line_width=1.4,
+            increasing_line_width=1.5,
+            decreasing_line_width=1.5,
         ),
         row=1,
         col=1
     )
 
+    # MA5
+    if "ma5" in visible_df.columns:
+        fig.add_trace(
+            go.Scatter(
+                x=visible_df.index,
+                y=visible_df["ma5"],
+                mode="lines",
+                name="MA5",
+                line=dict(width=2),
+            ),
+            row=1,
+            col=1
+        )
+
+    # MA20
     if "ma20" in visible_df.columns:
         fig.add_trace(
             go.Scatter(
@@ -124,6 +131,7 @@ def render_overview(d, code_input):
             col=1
         )
 
+    # MA60
     if "ma60" in visible_df.columns:
         fig.add_trace(
             go.Scatter(
@@ -137,6 +145,7 @@ def render_overview(d, code_input):
             col=1
         )
 
+    # 成交量
     fig.add_trace(
         go.Bar(
             x=visible_df.index,
@@ -148,8 +157,8 @@ def render_overview(d, code_input):
     )
 
     fig.update_layout(
-        title=f"{d.get('name', code_input)} 固定視窗K線圖",
-        height=560,
+        title=None,  # 拿掉圖內標題
+        height=640,  # K線放大一些
         xaxis_rangeslider_visible=False,
         dragmode=False,
         legend=dict(
@@ -159,14 +168,13 @@ def render_overview(d, code_input):
             xanchor="left",
             x=0
         ),
-        margin=dict(l=10, r=10, t=45, b=10),
+        margin=dict(l=10, r=10, t=20, b=10),
     )
 
-    # 第一列Y軸依目前視窗高低點自動調整
     fig.update_yaxes(range=[y_min, y_max], row=1, col=1)
 
-    # ===== 控制圖表寬度，不要佔滿整頁 =====
-    chart_left, chart_center, chart_right = st.columns([1.5, 5, 1.5])
+    # 控制寬度
+    chart_left, chart_center, chart_right = st.columns([1.2, 5.6, 1.2])
 
     with chart_center:
         st.plotly_chart(
