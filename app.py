@@ -877,7 +877,7 @@ if code_input:
                 t3.metric("布林上軌", f"{bb_upper:.1f} ({bb_upper_text})",
                           help=f"布林上軌：{bb_upper:.1f} ({bb_upper_text})\n股價突破上軌代表強勢。")
                 t3.metric("布林中軌", f"{bb_mid:.1f}",
-                          help=f"布林中軌：{bb_mid:.1f}\\n20日移動平均線。")
+                          help=f"布林中軌 {bb_mid:.1f} - 20日移動平均線")
                 if price < bb_lower:
                     bb_lower_text =":red[多頭弱、偏保守🔴]"
                 else:
@@ -1050,6 +1050,7 @@ if code_input:
                 st.error("🔧 請先在 Streamlit Cloud 設定 Secrets：App Settings → Secrets → GEMINI_API_KEY")
     else:
         st.write("✅這是Raymond的台股深度分析，請輸入正確的股票代碼")
+
 
 
 
