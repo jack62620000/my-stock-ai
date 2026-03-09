@@ -29,25 +29,25 @@ if tab_market == "📈 大盤指數":
 
 elif tab_market == "📊 個股分析":
 # --- 1. 股票名稱抓取 ---
-@st.cache_data(ttl=86400)
-def get_all_names():
-    names = {"2330": "台積電", "3131": "弘塑", "2317": "鴻海"}
-    try:
-        for url in ["https://isin.twse.com.tw/isin/C_public.jsp?strMode=2", "https://isin.twse.com.tw/isin/C_public.jsp?strMode=4"]:
-            df = pd.read_html(url)[0]
-            for item in df[0]:
-                if '　' in str(item):
-                    p = str(item).split('　')
-                    if len(p) >= 2: 
-                        names[p[0].strip()] = p[1].strip()
-    except Exception: 
-        pass
-    return names
+    @st.cache_data(ttl=86400)
+    def get_all_names():
+        names = {"2330": "台積電", "3131": "弘塑", "2317": "鴻海"}
+        try:
+            for url in ["https://isin.twse.com.tw/isin/C_public.jsp?strMode=2", "https://isin.twse.com.tw/isin/C_public.jsp?strMode=4"]:
+                df = pd.read_html(url)[0]
+                for item in df[0]:
+                    if '　' in str(item):
+                        p = str(item).split('　')
+                        if len(p) >= 2: 
+                            names[p[0].strip()] = p[1].strip()
+        except Exception: 
+            pass
+        return names
 
-name_map = get_all_names()
+    name_map = get_all_names()
 
-st.sidebar.markdown("### 📈 **台股深度分析**")
-st.sidebar.markdown("---")
+    st.sidebar.markdown("### 📈 **台股深度分析**")
+    st.sidebar.markdown("---")
 
 # --- 2. 核心資料與指標計算 ---
 @st.cache_data(ttl=300)
@@ -1073,6 +1073,7 @@ if code_input:
                 st.error("🔧 請先在 Streamlit Cloud 設定 Secrets：App Settings → Secrets → GEMINI_API_KEY")
     else:
         st.write("✅這是Raymond的台股深度分析，請輸入正確的股票代碼")
+
 
 
 
