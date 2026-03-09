@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 from core.valuation import calc_fair_price, calc_margin_of_safety
 
 
@@ -26,44 +27,90 @@ def render_overview(d, code_input):
     st.markdown("---")
 
     if not df.empty:
-        fig = go.Figure()
+        fig = make_subplots(
+            rows=2,
+            cols=1,
+            shared_xaxes=True,
+            vertical_spacing=0.04,
+            row_heights=[0.78, 0.22],
+            specs=[[{"secondary_y": False}], [{"secondary_y": False}]]
+        )
 
-        fig.add_trace(go.Candlestick(
-            x=df.index,
-            open=df["Open"],
-            high=df["High"],
-            low=df["Low"],
-            close=df["Close"],
-            name="K線",
-        ))
+        # K線
+        fig.add_trace(
+            go.Candlestick(
+                x=df.index,
+                open=df["Open"],
+                high=df["High"],
+                low=df["Low"],
+                close=df["Close"],
+                name="K線",
+            ),
+            row=1, col=1
+        )
 
+        # 均線
         if "ma20" in df.columns:
-            fig.add_trace(go.Scatter(x=df.index, y=df["ma20"], mode="lines", name="MA20"))
+            fig.add_trace(
+                go.Scatter(
+                    x=df.index,
+                    y=df["ma20"],
+                    mode="lines",
+                    name="MA20",
+                    line=dict(width=2)
+                ),
+                row=1, col=1
+            )
+
         if "ma60" in df.columns:
-            fig.add_trace(go.Scatter(x=df.index, y=df["ma60"], mode="lines", name="MA60"))
+            fig.add_trace(
+                go.Scatter(
+                    x=df.index,
+                    y=df["ma60"],
+                    mode="lines",
+                    name="MA60",
+                    line=dict(width=2)
+                ),
+                row=1, col=1
+            )
+
+        # 成交量
+        fig.add_trace(
+            go.Bar(
+                x=df.index,
+                y=df["Volume"],
+                name="成交量",
+            ),
+            row=2, col=1
+        )
 
         fig.update_layout(
             title=f"{d.get('name', code_input)} 近一年K線圖",
-            height=520,
+            height=820,   # 這裡直接放大
             xaxis_rangeslider_visible=False,
-            legend_orientation="h",
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="left",
+                x=0
+            ),
+            margin=dict(l=20, r=20, t=60, b=20)
         )
 
-        st.plotly_chart(fig, use_container_width=True)
+        fig.update_yaxes(title_text="股價", row=1, col=1)
+        fig.update_yaxes(title_text="成交量", row=2, col=1)
 
-        vol_fig = go.Figure()
-        vol_fig.add_trace(go.Bar(x=df.index, y=df["Volume"], name="成交量"))
-        vol_fig.update_layout(height=260, title="成交量", showlegend=False)
-        st.plotly_chart(vol_fig, use_container_width=True)
+        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
-    with st.expander("查看原始財報表"):
+    with st.expander("查看原始財報表", expanded=False):
         c1, c2, c3 = st.columns(3)
         with c1:
             st.caption("損益表")
-            st.dataframe(d.get("financials", pd.DataFrame()), use_container_width=True)
+            st.dataframe(d.get("financials", pd.DataFrame()), use_container_width=True, height=320)
         with c2:
             st.caption("資產負債表")
-            st.dataframe(d.get("balance_sheet", pd.DataFrame()), use_container_width=True)
+            st.dataframe(d.get("balance_sheet", pd.DataFrame()), use_container_width=True, height=320)
         with c3:
             st.caption("現金流量表")
-            st.dataframe(d.get("cashflow", pd.DataFrame()), use_container_width=True)
+            st.dataframe(d.get("cashflow", pd.DataFrame()), use_container_width=True, height=320)
