@@ -23,6 +23,12 @@ def _resample_ohlcv(df: pd.DataFrame, freq: str) -> pd.DataFrame:
     return out.dropna(subset=["Open", "High", "Low", "Close"])
 
 
+def _fmt_num(v, digits=1, suffix=""):
+    if pd.isna(v):
+        return "N/A"
+    return f"{v:.{digits}f}{suffix}"
+
+
 def render_overview(d, code_input):
     df = d.get("df", pd.DataFrame())
     price = d.get("price", 0)
@@ -30,25 +36,140 @@ def render_overview(d, code_input):
     fair_price = calc_fair_price(d)
     margin = calc_margin_of_safety(d)
 
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("即時股價", f"{price:.1f}")
-    col2.metric("漲跌額", f"{d.get('price_change_amount', 0):+.1f}")
-    col3.metric("漲跌幅", f"{d.get('price_change', 0):+.1f}%")
-    col4.metric("52週位置", f"{position_52 * 100:.1f}%" if pd.notna(position_52) else "N/A")
+    st.markdown(
+        """
+        <style>
+        .quote-card {
+            background: #ffffff;
+            border: 1px solid #e8e8e8;
+            border-radius: 14px;
+            padding: 14px 16px;
+            margin-bottom: 10px;
+        }
+        .quote-title {
+            font-size: 1.55rem;
+            font-weight: 700;
+            color: #222;
+            margin-bottom: 8px;
+        }
+        .quote-grid {
+            display: grid;
+            grid-template-columns: repeat(7, minmax(90px, 1fr));
+            gap: 10px 14px;
+            margin-top: 6px;
+            margin-bottom: 6px;
+        }
+        .quote-item {
+            padding: 4px 0;
+        }
+        .quote-label {
+            font-size: 0.92rem;
+            color: #666;
+            margin-bottom: 3px;
+        }
+        .quote-value {
+            font-size: 1.35rem;
+            font-weight: 700;
+            color: #111;
+            line-height: 1.2;
+        }
+        .ma-grid {
+            display: grid;
+            grid-template-columns: repeat(6, minmax(90px, 1fr));
+            gap: 8px 14px;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #f0f0f0;
+        }
+        .ma-item {
+            font-size: 1rem;
+            color: #333;
+            line-height: 1.35;
+        }
+        .ma-label {
+            color: #777;
+            font-size: 0.88rem;
+            display: block;
+            margin-bottom: 2px;
+        }
+        .mini-metrics {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(90px, 1fr));
+            gap: 10px 14px;
+            margin-bottom: 14px;
+        }
+        .mini-card {
+            background: #ffffff;
+            border: 1px solid #e8e8e8;
+            border-radius: 12px;
+            padding: 10px 14px;
+        }
+        .mini-label {
+            font-size: 0.88rem;
+            color: #666;
+        }
+        .mini-value {
+            font-size: 1.18rem;
+            font-weight: 700;
+            color: #111;
+            margin-top: 2px;
+        }
+        .toolbar-wrap {
+            background: #ffffff;
+            border: 1px solid #e8e8e8;
+            border-radius: 12px;
+            padding: 10px 14px 2px 14px;
+            margin: 10px 0 14px 0;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
-    col5, col6, col7, col8 = st.columns(4)
-    col5.metric("EPS", f"{d.get('eps', 0):.2f}" if pd.notna(d.get("eps")) else "N/A")
-    col6.metric("本益比(P/E)", f"{d.get('pe', 0):.1f}x" if pd.notna(d.get("pe")) else "N/A")
-    col7.metric("估算合理價", f"{fair_price:.1f}" if pd.notna(fair_price) else "N/A")
-    col8.metric("安全邊際", f"{margin * 100:.1f}%" if pd.notna(margin) else "N/A")
-
-    st.markdown("---")
+    # ===== 上方摘要小卡 =====
+    summary_html = f"""
+    <div class="mini-metrics">
+        <div class="mini-card">
+            <div class="mini-label">即時股價</div>
+            <div class="mini-value">{_fmt_num(price, 1)}</div>
+        </div>
+        <div class="mini-card">
+            <div class="mini-label">漲跌額</div>
+            <div class="mini-value">{_fmt_num(d.get('price_change_amount', 0), 1)}</div>
+        </div>
+        <div class="mini-card">
+            <div class="mini-label">漲跌幅</div>
+            <div class="mini-value">{_fmt_num(d.get('price_change', 0), 1, '%')}</div>
+        </div>
+        <div class="mini-card">
+            <div class="mini-label">52週位置</div>
+            <div class="mini-value">{_fmt_num(position_52 * 100, 1, '%') if pd.notna(position_52) else 'N/A'}</div>
+        </div>
+        <div class="mini-card">
+            <div class="mini-label">EPS</div>
+            <div class="mini-value">{_fmt_num(d.get('eps'), 2)}</div>
+        </div>
+        <div class="mini-card">
+            <div class="mini-label">本益比(P/E)</div>
+            <div class="mini-value">{_fmt_num(d.get('pe'), 1, 'x')}</div>
+        </div>
+        <div class="mini-card">
+            <div class="mini-label">估算合理價</div>
+            <div class="mini-value">{_fmt_num(fair_price, 1)}</div>
+        </div>
+        <div class="mini-card">
+            <div class="mini-label">安全邊際</div>
+            <div class="mini-value">{_fmt_num(margin * 100, 1, '%') if pd.notna(margin) else 'N/A'}</div>
+        </div>
+    </div>
+    """
+    st.markdown(summary_html, unsafe_allow_html=True)
 
     if df.empty:
         st.warning("沒有K線資料")
         return
 
-    # ===== 控制列 =====
+    # ===== 切換區 =====
     ctrl1, ctrl2 = st.columns([2, 2])
 
     with ctrl1:
@@ -87,24 +208,6 @@ def render_overview(d, code_input):
 
     max_start = max(len(chart_df) - window_size, 0)
 
-    st.markdown("### 📊 固定視窗 K 線圖")
-
-    btn_left, _, btn_right = st.columns([1.2, 4.6, 1.2])
-
-    with btn_left:
-        if st.button("⬅ 往左看更早資料", use_container_width=True, key=f"left_btn_{code_input}_{period_type}_{window_size}"):
-            st.session_state[session_key] = max(
-                0,
-                st.session_state.get(session_key, max(len(chart_df) - window_size, 0)) - 10
-            )
-
-    with btn_right:
-        if st.button("往右看更新資料 ➡", use_container_width=True, key=f"right_btn_{code_input}_{period_type}_{window_size}"):
-            st.session_state[session_key] = min(
-                max_start,
-                st.session_state.get(session_key, max(len(chart_df) - window_size, 0)) + 10
-            )
-
     start_idx = min(st.session_state[session_key], max_start)
     st.session_state[session_key] = start_idx
 
@@ -114,7 +217,7 @@ def render_overview(d, code_input):
         st.warning("目前視窗內沒有資料")
         return
 
-    # ===== 上方資訊列 =====
+    # ===== 報價資訊列 =====
     last_row = visible_df.iloc[-1]
     open_p = last_row["Open"]
     high_p = last_row["High"]
@@ -125,25 +228,100 @@ def render_overview(d, code_input):
     prev_close = visible_df["Close"].iloc[-2] if len(visible_df) >= 2 else close_p
     change = close_p - prev_close
 
-    st.markdown(f"### {d.get('name', code_input)} ({code_input})")
+    ma5_val = visible_df["ma5"].iloc[-1] if "ma5" in visible_df.columns else float("nan")
+    ma10_val = visible_df["ma10"].iloc[-1] if "ma10" in visible_df.columns else float("nan")
+    ma20_val = visible_df["ma20"].iloc[-1] if "ma20" in visible_df.columns else float("nan")
+    ma60_val = visible_df["ma60"].iloc[-1] if "ma60" in visible_df.columns else float("nan")
+    mv5_val = visible_df["mv5"].iloc[-1] if "mv5" in visible_df.columns else float("nan")
+    mv20_val = visible_df["mv20"].iloc[-1] if "mv20" in visible_df.columns else float("nan")
 
-    i1, i2, i3, i4, i5, i6, i7 = st.columns(7)
-    i1.metric("日期", last_row.name.strftime("%Y/%m/%d"))
-    i2.metric("開", f"{open_p:.0f}")
-    i3.metric("高", f"{high_p:.0f}")
-    i4.metric("低", f"{low_p:.0f}")
-    i5.metric("收", f"{close_p:.0f}")
-    i6.metric("量(張)", f"{int(vol / 1000):,}")
-    i7.metric("漲跌", f"{change:+.0f}")
+    quote_html = f"""
+    <div class="quote-card">
+        <div class="quote-title">{d.get('name', code_input)} ({code_input})</div>
+        <div class="quote-grid">
+            <div class="quote-item">
+                <div class="quote-label">日期</div>
+                <div class="quote-value">{last_row.name.strftime("%Y/%m/%d")}</div>
+            </div>
+            <div class="quote-item">
+                <div class="quote-label">開盤價</div>
+                <div class="quote-value">{_fmt_num(open_p, 0)}</div>
+            </div>
+            <div class="quote-item">
+                <div class="quote-label">最高價</div>
+                <div class="quote-value">{_fmt_num(high_p, 0)}</div>
+            </div>
+            <div class="quote-item">
+                <div class="quote-label">最低價</div>
+                <div class="quote-value">{_fmt_num(low_p, 0)}</div>
+            </div>
+            <div class="quote-item">
+                <div class="quote-label">收盤價</div>
+                <div class="quote-value">{_fmt_num(close_p, 0)}</div>
+            </div>
+            <div class="quote-item">
+                <div class="quote-label">成交量(股)</div>
+                <div class="quote-value">{int(vol):,}</div>
+            </div>
+            <div class="quote-item">
+                <div class="quote-label">漲跌</div>
+                <div class="quote-value">{_fmt_num(change, 0)}</div>
+            </div>
+        </div>
 
-    # ===== 均線說明列 =====
-    ma_cols = st.columns(6)
-    ma_cols[0].caption(f"MA5：{visible_df['ma5'].iloc[-1]:.1f}" if "ma5" in visible_df.columns and pd.notna(visible_df["ma5"].iloc[-1]) else "MA5：N/A")
-    ma_cols[1].caption(f"MA10：{visible_df['ma10'].iloc[-1]:.1f}" if "ma10" in visible_df.columns and pd.notna(visible_df["ma10"].iloc[-1]) else "MA10：N/A")
-    ma_cols[2].caption(f"MA20：{visible_df['ma20'].iloc[-1]:.1f}" if "ma20" in visible_df.columns and pd.notna(visible_df["ma20"].iloc[-1]) else "MA20：N/A")
-    ma_cols[3].caption(f"MA60：{visible_df['ma60'].iloc[-1]:.1f}" if "ma60" in visible_df.columns and pd.notna(visible_df["ma60"].iloc[-1]) else "MA60：N/A")
-    ma_cols[4].caption(f"MV5：{visible_df['mv5'].iloc[-1]:.1f}" if "mv5" in visible_df.columns and pd.notna(visible_df["mv5"].iloc[-1]) else "MV5：N/A")
-    ma_cols[5].caption(f"MV20：{visible_df['mv20'].iloc[-1]:.1f}" if "mv20" in visible_df.columns and pd.notna(visible_df["mv20"].iloc[-1]) else "MV20：N/A")
+        <div class="ma-grid">
+            <div class="ma-item"><span class="ma-label">MA5</span>{_fmt_num(ma5_val, 1)}</div>
+            <div class="ma-item"><span class="ma-label">MA10</span>{_fmt_num(ma10_val, 1)}</div>
+            <div class="ma-item"><span class="ma-label">MA20</span>{_fmt_num(ma20_val, 1)}</div>
+            <div class="ma-item"><span class="ma-label">MA60</span>{_fmt_num(ma60_val, 1)}</div>
+            <div class="ma-item"><span class="ma-label">MV5</span>{_fmt_num(mv5_val, 1)}</div>
+            <div class="ma-item"><span class="ma-label">MV20</span>{_fmt_num(mv20_val, 1)}</div>
+        </div>
+    </div>
+    """
+    st.markdown(quote_html, unsafe_allow_html=True)
+
+    # ===== 把切換列移到報價列與圖中間 =====
+    st.markdown('<div class="toolbar-wrap">', unsafe_allow_html=True)
+    tool1, tool2 = st.columns([2, 2])
+
+    with tool1:
+        period_type = st.radio(
+            "K線週期",
+            ["日", "週", "月"],
+            horizontal=True,
+            index=["日", "週", "月"].index(period_type),
+            key=f"period_type_toolbar_{code_input}",
+        )
+
+    with tool2:
+        window_size = st.radio(
+            "顯示根數",
+            [30, 60, 120],
+            horizontal=True,
+            index=[30, 60, 120].index(window_size),
+            key=f"window_size_toolbar_{code_input}",
+        )
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    # toolbar 重新套用
+    chart_df = df.copy()
+    if period_type == "週":
+        chart_df = _resample_ohlcv(chart_df, "W")
+    elif period_type == "月":
+        chart_df = _resample_ohlcv(chart_df, "M")
+
+    session_key = f"chart_start_{code_input}_{period_type}_{window_size}"
+    if session_key not in st.session_state:
+        st.session_state[session_key] = max(len(chart_df) - window_size, 0)
+
+    max_start = max(len(chart_df) - window_size, 0)
+    start_idx = min(st.session_state[session_key], max_start)
+    visible_df = chart_df.iloc[start_idx:start_idx + window_size].copy()
+
+    if visible_df.empty:
+        st.warning("目前視窗內沒有資料")
+        return
 
     # ===== 自動Y軸 =====
     visible_high = visible_df["High"].max()
@@ -153,7 +331,6 @@ def render_overview(d, code_input):
         if visible_high != visible_low
         else visible_high * 0.03
     )
-
     y_min = visible_low - price_padding
     y_max = visible_high + price_padding
 
@@ -163,7 +340,7 @@ def render_overview(d, code_input):
         cols=1,
         shared_xaxes=True,
         vertical_spacing=0.03,
-        row_heights=[0.78, 0.22],
+        row_heights=[0.80, 0.20],
     )
 
     fig.add_trace(
@@ -216,7 +393,7 @@ def render_overview(d, code_input):
                 y=visible_df["mv5"],
                 mode="lines",
                 name="MV5",
-                line=dict(width=1.3),
+                line=dict(width=1.2),
             ),
             row=2, col=1
         )
@@ -228,7 +405,7 @@ def render_overview(d, code_input):
                 y=visible_df["mv20"],
                 mode="lines",
                 name="MV20",
-                line=dict(width=1.3),
+                line=dict(width=1.2),
             ),
             row=2, col=1
         )
@@ -241,7 +418,7 @@ def render_overview(d, code_input):
         legend=dict(
             orientation="h",
             yanchor="bottom",
-            y=1.02,
+            y=1.01,
             xanchor="left",
             x=0
         ),
@@ -250,9 +427,20 @@ def render_overview(d, code_input):
 
     fig.update_yaxes(range=[y_min, y_max], row=1, col=1)
 
-    chart_left, chart_center, chart_right = st.columns([1.0, 6.0, 1.0])
+    # ===== 左右按鈕直接放在圖左右，按鈕變窄 =====
+    wrap_left, wrap_center, wrap_right = st.columns([0.9, 6.2, 0.9])
 
-    with chart_center:
+    with wrap_left:
+        st.write("")
+        st.write("")
+        if st.button("⬅ 更早", use_container_width=True, key=f"left_btn_{code_input}_{period_type}_{window_size}"):
+            st.session_state[session_key] = max(
+                0,
+                st.session_state.get(session_key, max(len(chart_df) - window_size, 0)) - 10
+            )
+            st.rerun()
+
+    with wrap_center:
         st.plotly_chart(
             fig,
             use_container_width=True,
@@ -261,6 +449,16 @@ def render_overview(d, code_input):
                 "scrollZoom": False
             }
         )
+
+    with wrap_right:
+        st.write("")
+        st.write("")
+        if st.button("更新 ➡", use_container_width=True, key=f"right_btn_{code_input}_{period_type}_{window_size}"):
+            st.session_state[session_key] = min(
+                max_start,
+                st.session_state.get(session_key, max(len(chart_df) - window_size, 0)) + 10
+            )
+            st.rerun()
 
     st.caption(
         f"目前顯示區間：{visible_df.index[0].strftime('%Y-%m-%d')} ～ {visible_df.index[-1].strftime('%Y-%m-%d')}"
