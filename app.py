@@ -4,7 +4,6 @@ import pandas as pd
 import pandas_ta as ta
 import google.generativeai as genai
 import numpy as np
-
 # --- 1. 股票名稱抓取 ---
 @st.cache_data(ttl=86400)
 def get_all_names():
@@ -20,9 +19,7 @@ def get_all_names():
     except Exception: 
         pass
     return names
-
 name_map = get_all_names()
-
 st.sidebar.markdown("### 📈 **台股深度分析**")
 st.sidebar.markdown("---")
 # --- 2. 核心資料與指標計算 ---
@@ -159,8 +156,8 @@ def get_deep_analysis_data(code):
                 df["macd"] = np.nan
                 df["macd_signal"] = np.nan
             df["布林上"], df["布林中"], df["布林下"] = ta.bbands(df["Close"]).iloc[:, 0], ta.bbands(df["Close"]).iloc[:, 1], ta.bbands(df["Close"]).iloc[:, 2]
-            df["52高"] = df["High"].max()
-            df["52低"] = df["Low"].min()
+            df["high_52"] = df["High"].max()
+            df["low_52"] = df["Low"].min()
             df["std"] = df["Close"].rolling(window=20).std()
             df["atr"] = ta.atr(df["High"], df["Low"], df["Close"], 14)
             latest = df.iloc[-1]
@@ -780,8 +777,8 @@ if code_input:
                     bb_lower_text = ":orange[偏中風險🟡]"
                 t3.metric("布林下軌", f"{bb_lower:.1f} ({bb_lower_text})",help=f"布林下軌：{bb_lower:.1f} ({bb_lower_text})\n股價跌破下軌代表弱勢。")
                 # （52週高/低）
-                high_52 = d.get("52高", 0)
-                low_52 = d.get("52低", 0)
+                high_52 = d.get("high_52", 0)
+                low_52 = d.get("low_52", 0)
                 if price > high_52:
                     high_text = ":green[52週新高(多頭強、但也偏貴)]"
                 else:
@@ -932,3 +929,4 @@ if code_input:
                 st.error("🔧 請先在 Streamlit Cloud 設定 Secrets：App Settings → Secrets → GEMINI_API_KEY")
     else:
         st.write("✅這是Raymond的台股深度分析，請輸入正確的股票代碼")
+
