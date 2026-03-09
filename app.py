@@ -850,7 +850,6 @@ if code_input:
                 t2.metric("RSI", f"{rsi:.1f} ({rsi_text})",
                   help=f"RSI：{rsi:.1f} ({rsi_text})\n相對強弱指標，>70過熱、<30過冷。")
                 macd_line = df["macd"].iloc[-1] if "macd" in df.columns else 0.0
-                macd_line = df["macd"].iloc[-1] if "macd" in df.columns else 0.0
                 macd_signal = df["macd_signal"].iloc[-1] if "macd_signal" in df.columns else 0.0
                 if macd_line > macd_signal:
                     macd_text = ":red[多頭]"
@@ -1051,6 +1050,7 @@ if code_input:
                 st.error("🔧 請先在 Streamlit Cloud 設定 Secrets：App Settings → Secrets → GEMINI_API_KEY")
     else:
         st.write("✅這是Raymond的台股深度分析，請輸入正確的股票代碼")
+
 
 
 
