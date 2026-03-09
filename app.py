@@ -155,7 +155,10 @@ def get_deep_analysis_data(code):
             except Exception as e:
                 df["macd"] = np.nan
                 df["macd_signal"] = np.nan
-            df["布林上"], df["布林中"], df["布林下"] = ta.bbands(df["Close"]).iloc[:, 0], ta.bbands(df["Close"]).iloc[:, 1], ta.bbands(df["Close"]).iloc[:, 2]
+            bb = ta.bbands(df["Close"])
+            df["布林上"] = bb.iloc[:,0]
+            df["布林中"] = bb.iloc[:,1]
+            df["布林下"] = bb.iloc[:,2]
             df["high_52"] = df["High"].max()
             df["low_52"] = df["Low"].min()
             df["std"] = df["Close"].rolling(window=20).std()
@@ -931,5 +934,6 @@ if code_input:
                 st.error("🔧 請先在 Streamlit Cloud 設定 Secrets：App Settings → Secrets → GEMINI_API_KEY")
     else:
         st.write("✅這是Raymond的台股深度分析，請輸入正確的股票代碼")
+
 
 
