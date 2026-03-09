@@ -449,7 +449,7 @@ if code_input:
                 gp_text = ":orange[合理🟡]"
             else:
                 gp_text = ":green[偏低⚠️]"
-            c1.metric(":question: 毛利率", f"{gp:.1f}% ({gp_text})",
+            c1.metric("毛利率", f"{gp:.1f}% ({gp_text})",
               help=f"毛利率：{gp:.1f}% ({gp_text})\n毛利率高代表公司定價能力與成本控管較強。")
             # 淨利率
             nm = d.get("net_margin", 0) * 100
@@ -1035,6 +1035,7 @@ if code_input:
                 st.error("🔧 請先在 Streamlit Cloud 設定 Secrets：App Settings → Secrets → GEMINI_API_KEY")
     else:
         st.write("✅這是Raymond的台股深度分析，請輸入正確的股票代碼")
+
 
 
 
