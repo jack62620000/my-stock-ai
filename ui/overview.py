@@ -43,32 +43,32 @@ def render_overview(d, code_input):
             background: #ffffff;
             border: 1px solid #e8e8e8;
             border-radius: 14px;
-            padding: 14px 16px;
-            margin-bottom: 10px;
+            padding: 16px 18px;
+            margin-bottom: 14px;
         }
         .quote-title {
-            font-size: 1.55rem;
+            font-size: 1.75rem;
             font-weight: 700;
             color: #222;
-            margin-bottom: 8px;
+            margin-bottom: 10px;
         }
         .quote-grid {
             display: grid;
             grid-template-columns: repeat(7, minmax(90px, 1fr));
-            gap: 10px 14px;
-            margin-top: 6px;
+            gap: 12px 16px;
+            margin-top: 8px;
             margin-bottom: 6px;
         }
         .quote-item {
             padding: 4px 0;
         }
         .quote-label {
-            font-size: 0.92rem;
+            font-size: 0.96rem;
             color: #666;
-            margin-bottom: 3px;
+            margin-bottom: 4px;
         }
         .quote-value {
-            font-size: 1.35rem;
+            font-size: 1.55rem;
             font-weight: 700;
             color: #111;
             line-height: 1.2;
@@ -76,21 +76,23 @@ def render_overview(d, code_input):
         .ma-grid {
             display: grid;
             grid-template-columns: repeat(6, minmax(90px, 1fr));
-            gap: 8px 14px;
-            margin-top: 10px;
-            padding-top: 10px;
+            gap: 10px 16px;
+            margin-top: 12px;
+            padding-top: 12px;
             border-top: 1px solid #f0f0f0;
         }
         .ma-item {
-            font-size: 1rem;
-            color: #333;
+            font-size: 1.08rem;
+            color: #222;
             line-height: 1.35;
+            font-weight: 600;
         }
         .ma-label {
             color: #777;
-            font-size: 0.88rem;
+            font-size: 0.90rem;
             display: block;
             margin-bottom: 2px;
+            font-weight: 400;
         }
         .mini-metrics {
             display: grid;
@@ -109,7 +111,7 @@ def render_overview(d, code_input):
             color: #666;
         }
         .mini-value {
-            font-size: 1.18rem;
+            font-size: 1.20rem;
             font-weight: 700;
             color: #111;
             margin-top: 2px;
@@ -169,30 +171,29 @@ def render_overview(d, code_input):
         st.warning("沒有K線資料")
         return
 
-    # ===== 切換區 =====
-    ctrl1, ctrl2 = st.columns([2, 2])
+    # ===== 切換列（只保留這一組） =====
+    toolbar_left, toolbar_right = st.columns([2, 2])
 
-    with ctrl1:
+    with toolbar_left:
         period_type = st.radio(
             "K線週期",
             ["日", "週", "月"],
             horizontal=True,
             index=0,
-            key=f"period_type_{code_input}",
+            key=f"period_type_toolbar_{code_input}",
         )
 
-    with ctrl2:
+    with toolbar_right:
         window_size = st.radio(
             "顯示根數",
             [30, 60, 120],
             horizontal=True,
             index=1,
-            key=f"window_size_{code_input}",
+            key=f"window_size_toolbar_{code_input}",
         )
 
     # ===== 週期轉換 =====
     chart_df = df.copy()
-
     if period_type == "週":
         chart_df = _resample_ohlcv(chart_df, "W")
     elif period_type == "月":
@@ -207,7 +208,6 @@ def render_overview(d, code_input):
         st.session_state[session_key] = max(len(chart_df) - window_size, 0)
 
     max_start = max(len(chart_df) - window_size, 0)
-
     start_idx = min(st.session_state[session_key], max_start)
     st.session_state[session_key] = start_idx
 
@@ -238,6 +238,7 @@ def render_overview(d, code_input):
     quote_html = f"""
     <div class="quote-card">
         <div class="quote-title">{d.get('name', code_input)} ({code_input})</div>
+
         <div class="quote-grid">
             <div class="quote-item">
                 <div class="quote-label">日期</div>
@@ -280,48 +281,6 @@ def render_overview(d, code_input):
     </div>
     """
     st.markdown(quote_html, unsafe_allow_html=True)
-
-    # ===== 把切換列移到報價列與圖中間 =====
-    st.markdown('<div class="toolbar-wrap">', unsafe_allow_html=True)
-    tool1, tool2 = st.columns([2, 2])
-
-    with tool1:
-        period_type = st.radio(
-            "K線週期",
-            ["日", "週", "月"],
-            horizontal=True,
-            index=["日", "週", "月"].index(period_type),
-            key=f"period_type_toolbar_{code_input}",
-        )
-
-    with tool2:
-        window_size = st.radio(
-            "顯示根數",
-            [30, 60, 120],
-            horizontal=True,
-            index=[30, 60, 120].index(window_size),
-            key=f"window_size_toolbar_{code_input}",
-        )
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    # toolbar 重新套用
-    chart_df = df.copy()
-    if period_type == "週":
-        chart_df = _resample_ohlcv(chart_df, "W")
-    elif period_type == "月":
-        chart_df = _resample_ohlcv(chart_df, "M")
-
-    session_key = f"chart_start_{code_input}_{period_type}_{window_size}"
-    if session_key not in st.session_state:
-        st.session_state[session_key] = max(len(chart_df) - window_size, 0)
-
-    max_start = max(len(chart_df) - window_size, 0)
-    start_idx = min(st.session_state[session_key], max_start)
-    visible_df = chart_df.iloc[start_idx:start_idx + window_size].copy()
-
-    if visible_df.empty:
-        st.warning("目前視窗內沒有資料")
-        return
 
     # ===== 自動Y軸 =====
     visible_high = visible_df["High"].max()
@@ -427,7 +386,7 @@ def render_overview(d, code_input):
 
     fig.update_yaxes(range=[y_min, y_max], row=1, col=1)
 
-    # ===== 左右按鈕直接放在圖左右，按鈕變窄 =====
+    # ===== 左右按鈕在圖左右 =====
     wrap_left, wrap_center, wrap_right = st.columns([0.9, 6.2, 0.9])
 
     with wrap_left:
