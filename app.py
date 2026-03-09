@@ -206,7 +206,9 @@ def get_deep_analysis_data(code):
                 "bb_upper": bb_upper,
                 "bb_lower": bb_lower,
                 "bb_mid": bb_mid,
-                "atr": atr,
+                "atr": atr, 
+                "high_52": df["High"].max(),
+                "low_52": df["Low"].min(),
                 # 財務與資本結構
                 "total_assets": total_assets,
                 "total_liabilities": total_liabilities,
@@ -929,4 +931,5 @@ if code_input:
                 st.error("🔧 請先在 Streamlit Cloud 設定 Secrets：App Settings → Secrets → GEMINI_API_KEY")
     else:
         st.write("✅這是Raymond的台股深度分析，請輸入正確的股票代碼")
+
 
