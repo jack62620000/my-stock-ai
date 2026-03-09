@@ -459,7 +459,7 @@ if code_input:
                 nm_text = ":orange[合理🟡]"
             else:
                 nm_text = ":green[偏低⚠️]"
-            c2.metric(":question: 淨利率", f"{nm:.1f}% ({nm_text})",
+            c2.metric("淨利率", f"{nm:.1f}% ({nm_text})",
               help=f"淨利率：{nm:.1f}% ({nm_text})\n淨利率高代表公司整體賺錢效率較佳。")
             # 營業利益率
             om = d.get("op_margin", 0) * 100
@@ -469,7 +469,7 @@ if code_input:
                 om_text = ":orange[合理🟡]"
             else:
                 om_text = ":green[偏低⚠️]"
-            c3.metric(":question: 營業利益率", f"{om:.1f}% ({om_text})",
+            c3.metric("營業利益率", f"{om:.1f}% ({om_text})",
               help=f"營業利益率：{om:.1f}% ({om_text})\n主要反映本業的獲利穩定度。")
             # EPS
             eps = d.get("eps", 0)
@@ -479,7 +479,7 @@ if code_input:
                 eps_text = ":orange[合理🟡]"
             else:
                 eps_text = ":green[偏低⚠️]"
-            c4.metric(":question: EPS", f"{eps:.2f} ({eps_text})",
+            c4.metric("EPS", f"{eps:.2f} ({eps_text})",
               help=f"EPS：{eps:.2f} ({eps_text})\n每股盈餘，代表公司為股東賺多少錢。")
             # ROE
             roe = d.get("roe", 0) * 100
@@ -489,7 +489,7 @@ if code_input:
                 roe_text = ":orange[合理🟡]"
             else:
                 roe_text =":green[偏低⚠️]"
-            c5.metric(":question: ROE", f"{roe:.1f}% ({roe_text})",
+            c5.metric("ROE", f"{roe:.1f}% ({roe_text})",
               help=f"ROE：{roe:.1f}% ({roe_text})\n權益報酬率，衡量股東資本的獲利效率。")
             # ROA
             roa = d.get("roa", 0) * 100
@@ -499,7 +499,7 @@ if code_input:
                 roa_text = ":orange[合理🟡]"
             else:
                 roa_text =":green[偏低⚠️]"
-            c6.metric(":question: ROA", f"{roa:.1f}% ({roa_text})",
+            c6.metric("ROA", f"{roa:.1f}% ({roa_text})",
               help=f"ROA：{roa:.1f}% ({roa_text})\n資產報酬率，衡量整體資產賺錢能力。")
             # EPS 成長率
             eps_growth = d.get("eps_growth", 0) * 100
@@ -509,7 +509,7 @@ if code_input:
                 eps_growth_text = ":orange[合理🟡]"
             else:
                 eps_growth_text =":green[偏低⚠️]"
-            c7.metric(":question: EPS 成長率", f"{eps_growth:.1f}% ({eps_growth_text})",
+            c7.metric("EPS 成長率", f"{eps_growth:.1f}% ({eps_growth_text})",
               help=f"EPS 成長率：{eps_growth:.1f}% ({eps_growth_text})\nEPS 的成長趨勢，看未來盈餘是否逐季／逐年增長。")
      
             # 成長性
@@ -523,7 +523,7 @@ if code_input:
                 rev_text = ":orange[合理🟡]"
             else:
                 rev_text =":green[偏低⚠️]"
-            g1.metric(":question: 營收成長率", f"{rev_growth:.1f}% ({rev_text})",
+            g1.metric("營收成長率", f"{rev_growth:.1f}% ({rev_text})",
               help=f"營收成長率：{rev_growth:.1f}% ({rev_text})\n衡量公司業務規模是否在擴張。")
             # EPS 成長率
             eps_growth = d.get("eps_growth", 0) * 100
@@ -533,7 +533,7 @@ if code_input:
                 eps_growth_text = ":orange[合理🟡]"
             else:
                 eps_growth_text =":green[偏低⚠️]"
-            g2.metric(":question: EPS 成長率", f"{eps_growth:.1f}% ({eps_growth_text})",
+            g2.metric("EPS 成長率", f"{eps_growth:.1f}% ({eps_growth_text})",
               help=f"EPS 成長率：{eps_growth:.1f}% ({eps_growth_text})\n每股盈餘的成長是否穩定。")
             # 淨利成長率
             net_income_growth = d.get("net_income_growth", 0) * 100
@@ -543,7 +543,7 @@ if code_input:
                 net_income_text = ":orange[合理🟡]"
             else:
                 net_income_text =":green[偏低⚠️]"
-            g3.metric(":question: 淨利成長率", f"{net_income_growth:.1f}% ({net_income_text})",
+            g3.metric("淨利成長率", f"{net_income_growth:.1f}% ({net_income_text})",
               help=f"淨利成長率：{net_income_growth:.1f}% ({net_income_text})\n淨利的成長趨勢，代表獲利品質的穩定度。")
             # 毛利成長率
             gross_profit_growth = d.get("gross_profit_growth", 0) * 100
@@ -553,7 +553,7 @@ if code_input:
                 gross_profit_text = ":orange[合理🟡]"
             else:
                 gross_profit_text =":green[偏低⚠️]"
-            g4.metric(":question: 毛利成長率", f"{gross_profit_growth:.1f}% ({gross_profit_text})",
+            g4.metric("毛利成長率", f"{gross_profit_growth:.1f}% ({gross_profit_text})",
               help=f"毛利成長率：{gross_profit_growth:.1f}% ({gross_profit_text})\n毛利的成長，是淨利成長的先行指標。")
             # 營業利益成長率
             op_income_growth = d.get("operating_income_growth", 0) * 100
@@ -563,7 +563,7 @@ if code_input:
                 op_income_text = ":orange[合理🟡]"
             else:
                 op_income_text =":green[偏低⚠️]"
-            g5.metric(":question: 營業利益成長率", f"{op_income_growth:.1f}% ({op_income_text})",
+            g5.metric("營業利益成長率", f"{op_income_growth:.1f}% ({op_income_text})",
               help=f"營業利益成長率：{op_income_growth:.1f}% ({op_income_text})\n本業利潤的成長狀況。")
             # 資產成長率
             assets_growth = d.get("assets_growth", 0) * 100
@@ -573,7 +573,7 @@ if code_input:
                 assets_text = ":orange[合理🟡]"
             else:
                 assets_text =":green[偏低⚠️]"
-            g6.metric(":question: 資產成長率", f"{assets_growth:.1f}% ({assets_text})",
+            g6.metric("資產成長率", f"{assets_growth:.1f}% ({assets_text})",
               help=f"資產成長率：{assets_growth:.1f}% ({assets_text})\n公司資產規模是否在擴張。")
             # 權益成長率
             equity_growth = d.get("equity_growth", 0) * 100
@@ -583,7 +583,7 @@ if code_input:
                 equity_text = ":orange[合理🟡]"
             else:
                 equity_text =":green[偏低⚠️]"
-            g7.metric(":question: 權益成長率", f"{equity_growth:.1f}% ({equity_text})",
+            g7.metric("權益成長率", f"{equity_growth:.1f}% ({equity_text})",
               help=f"權益成長率：{equity_growth:.1f}% ({equity_text})\n股東權益的成長，代表公司累積盈餘是否在增加。")
 
             # 財務結構
@@ -597,7 +597,7 @@ if code_input:
                 debt_text = ":orange[中等🟡]"
             else:
                 debt_text = ":green[高風險⚠️]"
-            f1.metric(":question: 負債比率", f"{debt_ratio:.1f}% ({debt_text})",
+            f1.metric("負債比率", f"{debt_ratio:.1f}% ({debt_text})",
               help=f"負債比率：{debt_ratio:.1f}% ({debt_text})\n越高代表公司負債壓力越大。")
             # 負債／股東權益
             debt_to_equity = d.get("debt_to_equity", 0) * 100
@@ -607,7 +607,7 @@ if code_input:
                 dte_text = ":orange[中等🟡]"
             else:
                 dte_text = ":green[高風險⚠️]"
-            f2.metric(":question: 負債/股東權益", f"{debt_to_equity:.1f}% ({dte_text})",
+            f2.metric("負債/股東權益", f"{debt_to_equity:.1f}% ({dte_text})",
               help=f"負債/股東權益：{debt_to_equity:.1f}% ({dte_text})\n衡量公司使用借貸槓桿的程度。")
             # 流動比率
             current_ratio = d.get("current_ratio", 0)
@@ -617,7 +617,7 @@ if code_input:
                 current_text = ":orange[合理🟡]"
             else:
                 current_text =":green[偏低⚠️]"
-            f3.metric(":question: 流動比率", f"{current_ratio:.2f} ({current_text})",
+            f3.metric("流動比率", f"{current_ratio:.2f} ({current_text})",
               help=f"流動比率：{current_ratio:.2f} ({current_text})\n衡量公司短期償債能力，一般以 1.5～2 倍為佳。")
             # 速動比率
             quick_ratio = d.get("quick_ratio", 0)
@@ -627,7 +627,7 @@ if code_input:
                 quick_text = ":orange[合理🟡]"
             else:
                 quick_text =":green[偏低⚠️]"
-            f4.metric(":question: 速動比率", f"{quick_ratio:.2f} ({quick_text})",
+            f4.metric("速動比率", f"{quick_ratio:.2f} ({quick_text})",
               help=f"速動比率：{quick_ratio:.2f} ({quick_text})\n扣除存貨後的短期償債能力指標，愈高愈好。")
             # 存貨佔資產比
             inv_asset_ratio = d.get("inv_asset_ratio", 0)
@@ -637,7 +637,7 @@ if code_input:
                 inv_text = ":orange[合理🟡]"
             else:
                 inv_text = ":red[偏低⭐️]"
-            f5.metric(":question: 存貨佔資產比", f"{inv_asset_ratio:.1%} ({inv_text})",
+            f5.metric("存貨佔資產比", f"{inv_asset_ratio:.1%} ({inv_text})",
               help=f"存貨佔資產比：{inv_asset_ratio:.1%} ({inv_text})\n存貨過高可能有跌價與庫存風險。")
             # 現金佔資產比
             cash_asset_ratio = d.get("cash_asset_ratio", 0)
@@ -647,7 +647,7 @@ if code_input:
                 cash_text = ":orange[合理🟡]"
             else:
                 cash_text =":green[偏低⚠️]"
-            f6.metric(":question: 現金佔資產比", f"{cash_asset_ratio:.1%} ({cash_text})",
+            f6.metric("現金佔資產比", f"{cash_asset_ratio:.1%} ({cash_text})",
               help=f"現金佔資產比：{cash_asset_ratio:.1%} ({cash_text})\n愈高代表公司現金儲備愈充裕。")
             # 非流動負債占負債比
             ncd_liabilities_ratio = d.get("ncd_liabilities_ratio", 0)
@@ -657,7 +657,7 @@ if code_input:
                 ncd_text = ":orange[合理🟡]"
             else:
                 ncd_text = ":red[偏低⭐️]"
-            f7.metric(":question: 非流動負債占負債比", f"{ncd_liabilities_ratio:.1%} ({ncd_text})",
+            f7.metric("非流動負債占負債比", f"{ncd_liabilities_ratio:.1%} ({ncd_text})",
               help=f"非流動負債占負債比：{ncd_liabilities_ratio:.1%} ({ncd_text})\n長期負債佔比愈高，財務結構愈偏長期化，但也可能增加利息支出壓力。")
 
             # 現金流品質
@@ -673,7 +673,7 @@ if code_input:
                 cfp_text = ":orange[合理🟡]"
             else:
                 cfp_text =":green[偏低⚠️]"
-            ca3.metric(":question: 現金流/淨利", f"{cashflow_profit_ratio:.2f} ({cfp_text})",
+            ca3.metric("現金流/淨利", f"{cashflow_profit_ratio:.2f} ({cfp_text})",
               help=f"現金流/淨利：{cashflow_profit_ratio:.2f} ({cfp_text})\n>1 代表現金流比淨利佳，公司獲利品質較好。")
             # FCF/營收
             fcf_revenue_ratio = d.get("fcf_revenue_ratio", 0)
@@ -683,7 +683,7 @@ if code_input:
                 fcf_rev_text = ":orange[合理🟡]"
             else:
                 fcf_rev_text =":green[偏低⚠️]"
-            ca4.metric(":question: FCF/營收", f"{fcf_revenue_ratio:.1%} ({fcf_rev_text})",
+            ca4.metric("FCF/營收", f"{fcf_revenue_ratio:.1%} ({fcf_rev_text})",
               help=f"FCF/營收：{fcf_revenue_ratio:.1%} ({fcf_rev_text})\n自由現金流佔營收的比例，愈高代表現金生成力愈強。")
             # FCF/股價
             fcf_price_ratio = d.get("fcf_price_ratio", 0)
@@ -693,7 +693,7 @@ if code_input:
                 fcf_price_text = ":orange[合理🟡]"
             else:
                 fcf_price_text =":green[偏低⚠️]"
-            ca5.metric(":question: FCF/股價", f"{fcf_price_ratio:.1%} ({fcf_price_text})",
+            ca5.metric("FCF/股價", f"{fcf_price_ratio:.1%} ({fcf_price_text})",
               help=f"FCF/股價：{fcf_price_ratio:.1%} ({fcf_price_text})\n每單位股價背後有多少自由現金流支撐。")
             # FCF 成長率
             fcf_growth = d.get("fcf_growth", 0) * 100
@@ -703,7 +703,7 @@ if code_input:
                 fcf_growth_text = ":orange[合理🟡]"
             else:
                 fcf_growth_text =":green[偏低⚠️]"
-            ca6.metric(":question: FCF 成長率", f"{fcf_growth:.1f}% ({fcf_growth_text})",
+            ca6.metric("FCF 成長率", f"{fcf_growth:.1f}% ({fcf_growth_text})",
                help=f"FCF 成長率：{fcf_growth:.1f}% ({fcf_growth_text})\n自由現金流的年成長率，代表現金生成力是否在提升。")
             # 資本支出／營業現金流
             capex_to_cashflow = d.get("capex_to_cashflow", 0)
@@ -713,8 +713,8 @@ if code_input:
                 capex_cf_text = ":orange[合理🟡]"
             else:
                 capex_cf_text =":green[偏低⚠️]"
-            ca7.metric(":question: 資本支出／營業現金流", f"{capex_to_cashflow:.2f} ({capex_cf_text})",
-               help=f"資本支出／營業現金流：{capex_to_cashflow:.2f} ({capex_cf_text})\n>1 代表資本支出比營業現金流還多，可能有現金流壓力。")
+            ca7.metric("資本支出/營業現金流", f"{capex_to_cashflow:.2f} ({capex_cf_text})",
+               help=f"資本支出/營業現金流：{capex_to_cashflow:.2f} ({capex_cf_text})\n>1 代表資本支出比營業現金流還多，可能有現金流壓力。")
 
             # 估值水準
             st.subheader("估值水準")
@@ -727,7 +727,7 @@ if code_input:
                 pe_text = ":orange[合理🟡]"
             else:
                 pe_text = ":red[偏低估⭐️]"
-            v1.metric(":question: 本益比(P/E)", f"{pe:.1f}x ({pe_text})",
+            v1.metric("本益比(P/E)", f"{pe:.1f}x ({pe_text})",
               help=f"本益比(P/E)：{pe:.1f}x ({pe_text})\n偏高代表可能較貴，偏低代表可能較便宜。")
             # 股價淨值比(P/B)
             pb = d.get("pb", 0)
@@ -737,7 +737,7 @@ if code_input:
                 pb_text = ":orange[合理🟡]"
             else:
                 pb_text = ":red[偏低估⭐️]"
-            v2.metric(":question: 股價淨值比(P/B)", f"{pb:.1f}x ({pb_text})",
+            v2.metric("股價淨值比(P/B)", f"{pb:.1f}x ({pb_text})",
               help=f"股價淨值比(P/B)：{pb:.1f}x ({pb_text})\n偏高代表可能高估，偏低代表可能低估，但與產業特性有關。")
             # PEG
             peg = d.get("peg", 0)
@@ -747,7 +747,7 @@ if code_input:
                 peg_text = ":orange[合理🟡]"
             else:
                 peg_text = ":red[偏低估⭐️]"
-            v3.metric(":question: PEG", f"{peg:.1f} ({peg_text})",
+            v3.metric("PEG", f"{peg:.1f} ({peg_text})",
               help=f"PEG：{peg:.1f} ({peg_text})\nPEG 用成長率調整本益比，愈接近 1 愈合理。")
             # 股利殖利率
             div_yield = d.get("dividend_yield", 0) * 100
@@ -757,7 +757,7 @@ if code_input:
                 div_text = ":orange[合理🟡]"
             else:
                 div_text =":green[偏低⚠️]"
-            v4.metric(":question: 股利殖利率", f"{div_yield:.1f}% ({div_text})",
+            v4.metric("股利殖利率", f"{div_yield:.1f}% ({div_text})",
               help=f"股利殖利率：{div_yield:.1f}% ({div_text})\n偏高代表現金回報較高，但要注意是否可持續。")
             # 盈餘配發率
             payout_ratio = d.get("payout_ratio", 0) * 100
@@ -767,7 +767,7 @@ if code_input:
                 payout_text = ":orange[合理🟡]"
             else:
                 payout_text =":green[偏低⚠️]"
-            v5.metric(":question: 盈餘配發率", f"{payout_ratio:.1f}% ({payout_text})",
+            v5.metric("盈餘配發率", f"{payout_ratio:.1f}% ({payout_text})",
               help=f"盈餘配發率：{payout_ratio:.1f}% ({payout_text})\n偏高代表多數盈餘用於配股，偏低則代表多數盈餘用於再投資。")
             # 現金股利報酬率
             cash_dividend_yield = d.get("cash_dividend_yield", 0) * 100
@@ -777,7 +777,7 @@ if code_input:
                 cd_text = ":orange[合理🟡]"
             else:
                 cd_text =":green[偏低⚠️]"
-            v6.metric(":question: 現金股利報酬率", f"{cash_dividend_yield:.1f}% ({cd_text})",
+            v6.metric("現金股利報酬率", f"{cash_dividend_yield:.1f}% ({cd_text})",
               help=f"現金股利報酬率：{cash_dividend_yield:.1f}% ({cd_text})\n多少現金股利相對於股價的比例。")
             # 帳面價值成長率
             book_value_growth = d.get("book_value_growth", 0) * 100
@@ -787,7 +787,7 @@ if code_input:
                 bv_text = ":orange[合理🟡]"
             else:
                 bv_text =":green[偏低⚠️]"
-            v7.metric(":question: 帳面價值成長率", f"{book_value_growth:.1f}% ({bv_text})",
+            v7.metric("帳面價值成長率", f"{book_value_growth:.1f}% ({bv_text})",
               help=f"帳面價值成長率：{book_value_growth:.1f}% ({bv_text})\n代表公司帳面資產與淨值的成長速度。")
             
 
@@ -810,21 +810,24 @@ if code_input:
                     ma5_text = ":red[多頭]"
                 else:
                     ma5_text = ":green[空頭]"
-                t1.write(f"MA5： {ma5:.1f} ({ma5_text})")
+                t1.metric("MA5", f"{ma5:.1f} ({ma5_text})",
+                  help=f"MA5：{ma5:.1f} ({ma5_text})\n5日均線，股價在均線上方為多頭。")
                 # MA20
                 ma20 = latest.get("ma20", price)
                 if price > ma20:
                     ma20_text = ":red[多頭]"
                 else:
                     ma20_text = ":green[空頭]"
-                t1.write(f"MA20： {ma20:.1f} ({ma20_text})")
+                t1.metric("MA20", f"{ma20:.1f} ({ma20_text})",
+                  help=f"MA20：{ma20:.1f} ({ma20_text})\n20日均線，中期趨勢判斷。")
                 # MA60
                 ma60 = latest.get("ma60", price)
                 if price > ma60:
                     ma60_text = ":red[多頭]"
                 else:
                     ma60_text = ":green[空頭]"
-                t1.write(f"MA60： {ma60:.1f} ({ma60_text})")
+                t1.metric("MA60", f"{ma60:.1f} ({ma60_text})",
+                  help=f"MA60：{ma60:.1f} ({ma60_text})\n60日均線，長期趨勢判斷。")
                 bias = d.get("bias", 0)
                 if bias > 10:
                     bias_text = ":red[偏離太大⚠️]"
@@ -832,7 +835,8 @@ if code_input:
                     bias_text =":green[偏離太小⭐️]"
                 else:
                     bias_text = ":orange[合理🟡]"
-                t1.write(f"乖離率： {bias:.1f}% ({bias_text})")
+                t1.metric("乖離率", f"{bias:.1f}% ({bias_text})",
+                  help=f"乖離率：{bias:.1f}% ({bias_text})\n股價偏離20日均線的百分比，±10%內為合理範圍。")
 
                 # 動能與強度
                 t2.subheader("動能與強度")
@@ -843,7 +847,8 @@ if code_input:
                     rsi_text = "過冷🟢"
                 else:
                     rsi_text = "中性🟡"
-                t2.write(f"RSI： {rsi:.1f} ({rsi_text})")
+                t2.metric("RSI", f"{rsi:.1f} ({rsi_text})",
+                  help=f"RSI：{rsi:.1f} ({rsi_text})\n相對強弱指標，>70過熱、<30過冷。")
                 macd_line = df["macd"].iloc[-1] if "macd" in df.columns else 0.0
                 macd_line = df["macd"].iloc[-1] if "macd" in df.columns else 0.0
                 macd_signal = df["macd_signal"].iloc[-1] if "macd_signal" in df.columns else 0.0
@@ -851,12 +856,14 @@ if code_input:
                     macd_text = ":red[多頭]"
                 else:
                     macd_text = ":green[空頭]"
-                t2.write(f"MACD 本體： {macd_line:+.2f} ({macd_text})")
+                t2.metric("MACD 本體", f"{macd_line:+.2f} ({macd_text})",
+                  help=f"MACD 本體：{macd_line:+.2f} ({macd_text})\nMACD線高於信號線為
                 if macd_signal > 0:
                     signal_text = ":red[多頭]"
                 else:
                     signal_text = ":green[空頭]"
-                t2.write(f"MACD 信號線： {macd_signal:+.2f} ({signal_text})")
+                t2.metric("MACD 信號線", f"{macd_signal:+.2f} ({signal_text})",
+                  help=f"MACD 信號線：{macd_signal:+.2f} ({signal_text})\n信號線>0為多頭趨勢。")
                 # 波動與區間
                 t3.subheader("波動與區間")
                 bb_upper = d.get("bb_upper", 0)
@@ -868,13 +875,16 @@ if code_input:
                     bb_upper_text =":red[多頭弱、偏保守🔴]"
                 else:
                     bb_upper_text = ":orange[合理🟡]"
-                t3.write(f"布林上： {bb_upper:.1f} ({bb_upper_text})")
-                t3.write(f"布林中： {bb_mid:.1f}")
+                t3.metric("布林上軌", f"{bb_upper:.1f} ({bb_upper_text})",
+                  help=f"布林上軌：{bb_upper:.1f} ({bb_upper_text})\n股價突破上軌代表強勢。")
+                t3.metric("布林中軌", f"{bb_mid:.1f}",
+                  help=f"布林中軌：{bb_mid:.1f}\n20日移動平均線。")
                 if price < bb_lower:
                     bb_lower_text =":red[多頭弱、偏保守🔴]"
                 else:
                     bb_lower_text = ":orange[偏中風險🟡]"
-                t3.write(f"布林下： {bb_lower:.1f} ({bb_lower_text})")
+                t3.metric("布林下軌", f"{bb_lower:.1f} ({bb_lower_text})",
+                  help=f"布林下軌：{bb_lower:.1f} ({bb_lower_text})\n股價跌破下軌代表弱勢。")
                 # （52週高/低）
                 high_52 = d.get("52高", 0)
                 low_52 = d.get("52低", 0)
@@ -882,12 +892,14 @@ if code_input:
                     high_text = ":green[52週新高(多頭強、但也偏貴)]"
                 else:
                     high_text = ":orange[未新高🟡]"
-                t3.write(f"52週高價： {high_52:.1f} ({high_text})")
+                t3.metric("52週高價", f"{high_52:.1f} ({high_text})",
+                  help=f"52週高價：{high_52:.1f} ({high_text})\n過去52週最高價。")
                 if price < low_52:
                     low_text = ":red[52週新低(多頭弱、但也偏便宜)]"
                 else:
                     low_text = ":orange[未新低🟡]"
-                t3.write(f"52週低價： {low_52:.1f} ({low_text})")
+                t3.metric("52週低價", f"{low_52:.1f} ({low_text})",
+                  help=f"52週低價：{low_52:.1f} ({low_text})\n過去52週最低價。")
                 std_20 = df["std"].iloc[-1] if "std" in df.columns else 0.0
                 if std_20 > 3:
                     std_text = ":green[波動大、風險高]"
@@ -895,7 +907,8 @@ if code_input:
                     std_text = ":orange[合理🟡]"
                 else:
                     std_text =":red[波動小、風險低]"
-                t3.write(f"標準差(20日)： {std_20:.2f} ({std_text})")
+                t3.metric("標準差(20日)", f"{std_20:.2f} ({std_text})",
+                  help=f"標準差(20日)：{std_20:.2f} ({std_text})\n衡量股價波動程度。")
                 atr = d.get("atr", 0)
                 if atr > 3:
                     atr_text = ":green[波動大、風險高]"
@@ -903,12 +916,14 @@ if code_input:
                     atr_text = ":orange[合理🟡]"
                 else:
                     atr_text =":red[波動小、風險低]"
-                t3.write(f"ATR(14日)： {atr:.2f} ({atr_text})")
+                t3.metric("ATR(14日)", f"{atr:.2f} ({atr_text})",
+                  help=f"ATR(14日)：{atr:.2f} ({atr_text})\n平均真實波幅，衡量每日波動範圍。")
 
                 # 成交量與量價關係
                 # 成交量與量價關係
                 t4.subheader("成交量與量價關係")
-                t4.write(f"今日成交量: {int(latest['Volume'] / 1000):,} 張")
+                t4.metric("今日成交量", f"{int(latest['Volume'] / 1000):,} 張",
+                  help=f"今日成交量：{int(latest['Volume'] / 1000):,} 張\n成交量放大代表市場關注度高。")
                 price_change_pct = d.get("price_change", 0)   # 今日漲跌幅 (%)
                 volume = latest['Volume']
                 avg_volume = df["Volume"][-30:].mean() if len(df) >= 30 else 0   # 用 30 日平均量
@@ -922,7 +937,8 @@ if code_input:
                     vol_price_text = "🟡 價跌量縮 - 市場觀望，偏中性"
                 else:
                     vol_price_text = "⚪ 價量正常 - 偏中性"
-                t4.write(f"量價：{vol_price_text}")
+                t4.metric("量價關係", vol_price_text,
+                  help=f"量價關係：{vol_price_text}\n價漲量增最健康，價跌量增最危險。")
 
 
         #  ========== 三、財務與資本結構（公司資本是否健康）==========
@@ -1035,6 +1051,7 @@ if code_input:
                 st.error("🔧 請先在 Streamlit Cloud 設定 Secrets：App Settings → Secrets → GEMINI_API_KEY")
     else:
         st.write("✅這是Raymond的台股深度分析，請輸入正確的股票代碼")
+
 
 
 
