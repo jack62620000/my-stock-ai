@@ -9,14 +9,11 @@ import numpy as np
 st.set_page_config(page_title="股票分析", layout="wide")
 
 # 🚀 左側邊欄導航（最重要！）
-tab_market = st.sidebar.radio("導航選單", 
-                              ["📈 大盤指數", "📊 個股分析"], 
-                              index=0)  # 預設顯示「大盤指數」
+tab_market = st.sidebar.radio("導航選單",["📈 大盤指數", "📊 個股分析"],index=0)  # 預設顯示「大盤指數」
 
 if tab_market == "📈 大盤指數":
     st.header("📈 大盤指數")
     st.info("🔄 即時更新中...")
-    
     # 大盤指數 metrics（示範）
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("台股加權指數", "22,350", "+1.2%", delta_color="normal")
@@ -24,11 +21,10 @@ if tab_market == "📈 大盤指數":
     col3.metric("櫃買指數", "285.6", "+0.8%", delta_color="normal")
     col4.metric("VIX 恐慌指數", "15.2", "-0.3%", delta_color="inverse")
     
-    st.subheader("📊 大盤熱門概念股")
-    # 這裡放你的概念股表格...
-
 elif tab_market == "📊 個股分析":
-# --- 1. 股票名稱抓取 ---
+# ✅ 1. 輸入個股代碼（只在這裡顯示）
+    stock_code = st.text_input("輸入個股代碼", value="2330")
+# ✅ 2. 股票名稱抓取（縮排正確）
     @st.cache_data(ttl=86400)
     def get_all_names():
         names = {"2330": "台積電", "3131": "弘塑", "2317": "鴻海"}
@@ -50,8 +46,7 @@ elif tab_market == "📊 個股分析":
     st.sidebar.markdown("---")
 
 # --- 2. 核心資料與指標計算 ---
-@st.cache_data(ttl=300)
-@st.cache_data(ttl=86400)
+@st.cache_data(ttl=6400)
 def get_deep_analysis_data(code):
     for suffix in [".TW", ".TWO"]:
         try:
@@ -1073,6 +1068,7 @@ if code_input:
                 st.error("🔧 請先在 Streamlit Cloud 設定 Secrets：App Settings → Secrets → GEMINI_API_KEY")
     else:
         st.write("✅這是Raymond的台股深度分析，請輸入正確的股票代碼")
+
 
 
 
