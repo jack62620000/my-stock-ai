@@ -70,7 +70,7 @@ def render_overview(d, code_input):
 
     visible_high = visible_df["High"].max()
     visible_low = visible_df["Low"].min()
-    price_padding = (visible_high - visible_low) * 0.08 if visible_high != visible_low else visible_high * 0.03
+    price_padding = (visible_high - visible_low) * 0.04 if visible_high != visible_low else visible_high * 0.03
 
     y_min = visible_low - price_padding
     y_max = visible_high + price_padding
@@ -79,12 +79,14 @@ def render_overview(d, code_input):
         rows=2,
         cols=1,
         shared_xaxes=True,
-        vertical_spacing=0.03,
-        row_heights=[0.78, 0.22],
+        vertical_spacing=0.02,
+        row_heights=[0.85, 0.15],
     )
 
     fig.add_trace(
         go.Candlestick(
+            increasing_line_width=1.4,
+            decreasing_line_width=1.4,
             x=visible_df.index,
             open=visible_df["Open"],
             high=visible_df["High"],
@@ -130,7 +132,7 @@ def render_overview(d, code_input):
 
     fig.update_layout(
         title=f"{d.get('name', code_input)} 固定視窗K線圖",
-        height=760,
+        height=560,
         xaxis_rangeslider_visible=False,
         dragmode=False,   # 不使用 plotly 自由拖曳
         legend=dict(
@@ -158,3 +160,4 @@ def render_overview(d, code_input):
     st.caption(
         f"目前顯示區間：{visible_df.index[0].strftime('%Y-%m-%d')} ～ {visible_df.index[-1].strftime('%Y-%m-%d')}"
     )
+
