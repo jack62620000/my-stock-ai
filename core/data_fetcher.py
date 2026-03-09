@@ -15,8 +15,8 @@ def get_all_names():
         ]:
             df = pd.read_html(url)[0]
             for item in df[0]:
-                if '　' in str(item):
-                    p = str(item).split('　')
+                if "　" in str(item):
+                    p = str(item).split("　")
                     if len(p) >= 2:
                         names[p[0].strip()] = p[1].strip()
     except Exception:
@@ -79,6 +79,7 @@ def get_deep_analysis_data(code, name_map=None):
                 else:
                     operating_income_growth = np.nan
             except Exception:
+                financials = pd.DataFrame()
                 net_income = np.nan
                 net_rev = np.nan
                 gross_profit_growth = np.nan
@@ -114,6 +115,7 @@ def get_deep_analysis_data(code, name_map=None):
                     else np.nan
                 )
             except Exception:
+                balance_sheet = pd.DataFrame()
                 total_assets = np.nan
                 total_liabilities = np.nan
                 equity = np.nan
@@ -133,6 +135,7 @@ def get_deep_analysis_data(code, name_map=None):
                 free_cashflow = operating_cashflow - capex if pd.notna(operating_cashflow) else np.nan
                 capex_to_cashflow = capex / operating_cashflow if pd.notna(operating_cashflow) and operating_cashflow not in [0, None] else np.nan
             except Exception:
+                cashflow = pd.DataFrame()
                 operating_cashflow = np.nan
                 capex = np.nan
                 free_cashflow = np.nan
@@ -149,10 +152,15 @@ def get_deep_analysis_data(code, name_map=None):
             cash_dividend_yield = div_per_share / price if pd.notna(price) and price not in [0, None] and pd.notna(div_per_share) else np.nan
             book_value_growth = equity_growth
 
+            # ===== 技術面 =====
             df = hist.copy()
             df["ma5"] = ta.sma(df["Close"], 5)
+            df["ma10"] = ta.sma(df["Close"], 10)
             df["ma20"] = ta.sma(df["Close"], 20)
             df["ma60"] = ta.sma(df["Close"], 60)
+            df["mv5"] = ta.sma(df["Volume"], 5)
+            df["mv20"] = ta.sma(df["Volume"], 20)
+
             df["偏差"] = (df["Close"] - df["ma20"]) / df["ma20"]
             df["rsi"] = ta.rsi(df["Close"], 14)
 
@@ -186,6 +194,7 @@ def get_deep_analysis_data(code, name_map=None):
             latest = df.iloc[-1]
             rsi = latest.get("rsi", 50)
             ma5 = latest.get("ma5", price)
+            ma10 = latest.get("ma10", price)
             ma20 = latest.get("ma20", price)
             ma60 = latest.get("ma60", price)
             bb_upper = latest.get("布林上", np.nan)
@@ -205,6 +214,7 @@ def get_deep_analysis_data(code, name_map=None):
                 "name": name_map.get(code, code),
                 "info": info,
                 "ticker_symbol": f"{code}{suffix}",
+
                 "gross_profit": gross_profit,
                 "net_margin": net_margin,
                 "op_margin": op_margin,
@@ -226,9 +236,11 @@ def get_deep_analysis_data(code, name_map=None):
                 "peg": info.get("pegRatio", np.nan),
                 "dividend_yield": div_yield,
                 "payout_ratio": payout_ratio,
+
                 "df": df,
                 "rsi": rsi,
                 "ma5": ma5,
+                "ma10": ma10,
                 "ma20": ma20,
                 "ma60": ma60,
                 "bias": bias,
@@ -239,26 +251,31 @@ def get_deep_analysis_data(code, name_map=None):
                 "high_52": high_52,
                 "low_52": low_52,
                 "position_52": position_52,
+
                 "total_assets": total_assets,
                 "total_liabilities": total_liabilities,
                 "equity": equity,
                 "capex": capex,
                 "capex_to_cashflow": capex_to_cashflow,
+
                 "gross_profit_growth": gross_profit_growth,
                 "operating_income_growth": operating_income_growth,
                 "assets_growth": assets_growth,
                 "equity_growth": equity_growth,
+
                 "inv_asset_ratio": inv_asset_ratio,
                 "cash_asset_ratio": cash_asset_ratio,
                 "ncd_liabilities_ratio": ncd_liabilities_ratio,
+
                 "fcf_revenue_ratio": fcf_revenue_ratio,
                 "fcf_price_ratio": fcf_price_ratio,
                 "fcf_growth": fcf_growth,
                 "cash_dividend_yield": cash_dividend_yield,
                 "book_value_growth": book_value_growth,
-                "financials": ticker.financials,
-                "balance_sheet": ticker.balance_sheet,
-                "cashflow": ticker.cashflow,
+
+                "financials": financials,
+                "balance_sheet": balance_sheet,
+                "cashflow": cashflow,
             }
 
         except Exception as e:
