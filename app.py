@@ -74,13 +74,14 @@ if code_input:
     if d:
         st.title(f"📊 {d.get('name', code_input)} ({code_input})")
 
-        tab1, tab2, tab3, tab4, tab5 = st.tabs([
-            "🏠 總覽",
-            "📌 基本面",
-            "📉 技術面",
-            "💵 現金流 / 股利",
-            "🤖 AI診斷",
-        ])
+        tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+    "🏠 總覽",
+    "📌 基本面",
+    "📉 技術面",
+    "🏦 財報表",
+    "💵 現金流 / 股利",
+    "🤖 AI診斷",
+])
 
         with tab1:
             render_overview(d, code_input)
@@ -123,3 +124,4 @@ if code_input:
         st.warning("找不到該股票資料，請確認股票代碼是否正確。")
 else:
     st.info("✅ 這是 Raymond 的台股深度分析，請輸入正確的股票代碼。")
+
