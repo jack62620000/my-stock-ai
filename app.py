@@ -6,7 +6,7 @@ from ui.overview import render_overview
 from ui.fundamentals import render_fundamentals, render_financial_structure
 from ui.technicals import render_technicals
 from ui.cashflow import render_cashflow_section
-
+from ui.financial_tables import render_financial_tables
 
 st.set_page_config(
     page_title="台股深度分析",
@@ -93,11 +93,13 @@ if code_input:
 
         with tab3:
             render_technicals(d)
-
         with tab4:
+            render_financial_tables(d)
+            
+        with tab5:
             render_cashflow_section(d)
 
-        with tab5:
+        with tab6:
             st.header("🤖 五、AI診斷")
             api_status = st.secrets.get("GEMINI_API_KEY", "")
             col1, col2 = st.columns([1, 4])
@@ -124,4 +126,5 @@ if code_input:
         st.warning("找不到該股票資料，請確認股票代碼是否正確。")
 else:
     st.info("✅ 這是 Raymond 的台股深度分析，請輸入正確的股票代碼。")
+
 
