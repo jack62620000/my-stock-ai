@@ -12,6 +12,7 @@ def render_overview(d, code_input):
     fair_price = calc_fair_price(d)
     margin = calc_margin_of_safety(d)
 
+    # ===== 上方重點指標 =====
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("即時股價", f"{price:.1f}")
     col2.metric("漲跌額", f"{d.get('price_change_amount', 0):+.1f}")
@@ -30,22 +31,8 @@ def render_overview(d, code_input):
         st.warning("沒有K線資料")
         return
 
-    # 固定視窗大小
+    # ===== 固定視窗設定 =====
     window_size = st.session_state.get("chart_window_size", 60)
-
-    st.markdown("### 📊 固定視窗 K 線圖")
-    c1, c2, c3 = st.columns([1, 2, 1])
-
-    with c1:
-        if st.button("⬅ 往左看更早資料", use_container_width=True):
-            st.session_state["chart_start"] = max(0, st.session_state.get("chart_start", max(len(df) - window_size, 0)) - 10)
-
-    with c3:
-        if st.button("往右看更新資料 ➡", use_container_width=True):
-            st.session_state["chart_start"] = min(
-                max(len(df) - window_size, 0),
-                st.session_state.get("chart_start", max(len(df) - window_size, 0)) + 10
-            )
 
     # 初始化起始位置：預設看最近一段
     if "chart_start" not in st.session_state:
@@ -53,6 +40,26 @@ def render_overview(d, code_input):
 
     max_start = max(len(df) - window_size, 0)
 
+    st.markdown("### 📊 固定視窗 K 線圖")
+
+    # 左右控制按鈕
+    btn_left, _, btn_right = st.columns([1.2, 4.6, 1.2])
+
+    with btn_left:
+        if st.button("⬅ 往左看更早資料", use_container_width=True):
+            st.session_state["chart_start"] = max(
+                0,
+                st.session_state.get("chart_start", max(len(df) - window_size, 0)) - 10
+            )
+
+    with btn_right:
+        if st.button("往右看更新資料 ➡", use_container_width=True):
+            st.session_state["chart_start"] = min(
+                max_start,
+                st.session_state.get("chart_start", max(len(df) - window_size, 0)) + 10
+            )
+
+    # slider 控制區間
     start_idx = st.slider(
         "移動K線視窗",
         min_value=0,
@@ -68,13 +75,19 @@ def render_overview(d, code_input):
         st.warning("目前視窗內沒有資料")
         return
 
+    # ===== 自動調整Y軸範圍 =====
     visible_high = visible_df["High"].max()
     visible_low = visible_df["Low"].min()
-    price_padding = (visible_high - visible_low) * 0.04 if visible_high != visible_low else visible_high * 0.03
+    price_padding = (
+        (visible_high - visible_low) * 0.04
+        if visible_high != visible_low
+        else visible_high * 0.03
+    )
 
     y_min = visible_low - price_padding
     y_max = visible_high + price_padding
 
+    # ===== 建立K線 + 成交量圖 =====
     fig = make_subplots(
         rows=2,
         cols=1,
@@ -85,16 +98,17 @@ def render_overview(d, code_input):
 
     fig.add_trace(
         go.Candlestick(
-            increasing_line_width=1.4,
-            decreasing_line_width=1.4,
             x=visible_df.index,
             open=visible_df["Open"],
             high=visible_df["High"],
             low=visible_df["Low"],
             close=visible_df["Close"],
             name="K線",
+            increasing_line_width=1.4,
+            decreasing_line_width=1.4,
         ),
-        row=1, col=1
+        row=1,
+        col=1
     )
 
     if "ma20" in visible_df.columns:
@@ -104,9 +118,10 @@ def render_overview(d, code_input):
                 y=visible_df["ma20"],
                 mode="lines",
                 name="MA20",
-                line=dict(width=2)
+                line=dict(width=2),
             ),
-            row=1, col=1
+            row=1,
+            col=1
         )
 
     if "ma60" in visible_df.columns:
@@ -116,9 +131,10 @@ def render_overview(d, code_input):
                 y=visible_df["ma60"],
                 mode="lines",
                 name="MA60",
-                line=dict(width=2)
+                line=dict(width=2),
             ),
-            row=1, col=1
+            row=1,
+            col=1
         )
 
     fig.add_trace(
@@ -127,14 +143,15 @@ def render_overview(d, code_input):
             y=visible_df["Volume"],
             name="成交量",
         ),
-        row=2, col=1
+        row=2,
+        col=1
     )
 
     fig.update_layout(
         title=f"{d.get('name', code_input)} 固定視窗K線圖",
         height=560,
         xaxis_rangeslider_visible=False,
-        dragmode=False,   # 不使用 plotly 自由拖曳
+        dragmode=False,
         legend=dict(
             orientation="h",
             yanchor="bottom",
@@ -142,22 +159,53 @@ def render_overview(d, code_input):
             xanchor="left",
             x=0
         ),
-        margin=dict(l=20, r=20, t=60, b=20),
+        margin=dict(l=10, r=10, t=45, b=10),
     )
 
+    # 第一列Y軸依目前視窗高低點自動調整
     fig.update_yaxes(range=[y_min, y_max], row=1, col=1)
-    fig.update_yaxes(row=2, col=1)
 
-    st.plotly_chart(
-        fig,
-        use_container_width=True,
-        config={
-            "displayModeBar": False,
-            "scrollZoom": False
-        }
-    )
+    # ===== 控制圖表寬度，不要佔滿整頁 =====
+    chart_left, chart_center, chart_right = st.columns([1.5, 5, 1.5])
+
+    with chart_center:
+        st.plotly_chart(
+            fig,
+            use_container_width=True,
+            config={
+                "displayModeBar": False,
+                "scrollZoom": False
+            }
+        )
 
     st.caption(
         f"目前顯示區間：{visible_df.index[0].strftime('%Y-%m-%d')} ～ {visible_df.index[-1].strftime('%Y-%m-%d')}"
     )
 
+    # ===== 原始財報表 =====
+    with st.expander("查看原始財報表", expanded=False):
+        c1, c2, c3 = st.columns(3)
+
+        with c1:
+            st.caption("損益表")
+            st.dataframe(
+                d.get("financials", pd.DataFrame()),
+                use_container_width=True,
+                height=320
+            )
+
+        with c2:
+            st.caption("資產負債表")
+            st.dataframe(
+                d.get("balance_sheet", pd.DataFrame()),
+                use_container_width=True,
+                height=320
+            )
+
+        with c3:
+            st.caption("現金流量表")
+            st.dataframe(
+                d.get("cashflow", pd.DataFrame()),
+                use_container_width=True,
+                height=320
+            )
