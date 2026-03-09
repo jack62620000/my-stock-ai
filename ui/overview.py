@@ -232,12 +232,13 @@ def render_overview(d, code_input):
         xaxis_rangeslider_visible=False,
         dragmode=False,
         legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=1.01,
-            xanchor="left",
-            x=0
-        ),
+    orientation="h",
+    yanchor="bottom",
+    y=1.01,
+    xanchor="left",
+    x=0,
+    traceorder="normal"
+),
         margin=dict(l=10, r=10, t=10, b=10),
     )
 
@@ -306,6 +307,7 @@ def render_overview(d, code_input):
                 use_container_width=True,
                 height=320
             )
+
 
 
 
