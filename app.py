@@ -856,13 +856,13 @@ if code_input:
                 else:
                     macd_text = ":green[空頭]"
                 t2.metric("MACD 本體", f"{macd_line:+.2f} ({macd_text})",
-                            help=f"MACD 本體：{macd_line:+.2f} ({macd_text})\\nMACD線高於信號線為多頭訊號。")
+                            help=f"MACD 本體：{macd_line:+.2f} ({macd_text})\MACD線高於信號線為多頭訊號。")
                 if macd_signal > 0:
                     signal_text = ":red[多頭]"
                 else:
                     signal_text = ":green[空頭]"
                 t2.metric("MACD 信號線", f"{macd_signal:+.2f} ({signal_text})",
-                            help=f"MACD 信號線：{macd_signal:+.2f} ({signal_text})\\n信號線>0為多頭趨勢。")
+                            help=f"MACD 信號線：{macd_signal:+.2f} ({signal_text})\信號線>0為多頭趨勢。")
                 # 波動與區間
                 t3.subheader("波動與區間")
                 bb_upper = d.get("bb_upper", 0)
@@ -875,9 +875,9 @@ if code_input:
                 else:
                     bb_upper_text = ":orange[合理🟡]"
                 t3.metric("布林上軌", f"{bb_upper:.1f} ({bb_upper_text})",
-                          help=f"布林上軌：{bb_upper:.1f} ({bb_upper_text})\\n股價突破上軌代表強勢。")
+                          help=f"布林上軌：{bb_upper:.1f} ({bb_upper_text})\n股價突破上軌代表強勢。")
                 t3.metric("布林中軌", f"{bb_mid:.1f}",
-                          help="布林中軌：{bb_mid:.1f}\\n20日移動平均線。")
+                          help="布林中軌：({bb_mid:.1f})\n20日移動平均線。")
                 if price < bb_lower:
                     bb_lower_text =":red[多頭弱、偏保守🔴]"
                 else:
@@ -1050,6 +1050,7 @@ if code_input:
                 st.error("🔧 請先在 Streamlit Cloud 設定 Secrets：App Settings → Secrets → GEMINI_API_KEY")
     else:
         st.write("✅這是Raymond的台股深度分析，請輸入正確的股票代碼")
+
 
 
 
