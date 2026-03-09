@@ -160,18 +160,18 @@ def render_overview(d, code_input):
     )
 
     fig.add_trace(
-        go.Candlestick(
-            x=visible_df.index,
-            open=visible_df["Open"],
-            high=visible_df["High"],
-            low=visible_df["Low"],
-            close=visible_df["Close"],
-            name="K線",
-            increasing_line_width=1.4,
-            decreasing_line_width=1.4,
-        ),
-        row=1, col=1
-    )
+    go.Candlestick(
+        x=visible_df.index,
+        open=visible_df["Open"],
+        high=visible_df["High"],
+        low=visible_df["Low"],
+        close=visible_df["Close"],
+        name="K線",
+        legendgroup="candlestick",
+        showlegend=True
+    ),
+    row=1, col=1
+)
 
     line_map = [
         ("ma5", "MA5"),
@@ -306,3 +306,4 @@ def render_overview(d, code_input):
                 use_container_width=True,
                 height=320
             )
+
