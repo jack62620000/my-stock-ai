@@ -171,7 +171,7 @@ def render_overview(d, code_input):
         showlegend=True
     ),
     row=1, col=1
-        
+    )    
 
     line_map = [
         ("ma5", "MA5"),
@@ -306,5 +306,6 @@ def render_overview(d, code_input):
                 use_container_width=True,
                 height=320
             )
+
 
 
