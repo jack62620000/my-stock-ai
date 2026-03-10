@@ -1,5 +1,5 @@
 from datetime import datetime
-
+from io import StringIO
 import numpy as np
 import pandas as pd
 import pandas_ta as ta
@@ -370,12 +370,22 @@ def fetch_mops_tables(form_id: str, market: str, roc_year: int, season: int):
         r.raise_for_status()
 
         text = r.text.strip()
+
+        st.write(f"MOPS form={form_id}, year={roc_year}, season={season}, len={len(text)}")
+        st.write("MOPS 前120字 =", text[:120])
+
         if not text:
             return []
 
-        return pd.read_html(text)
+        # 用 StringIO + lxml，比直接 read_html(text) 穩
+        tables = pd.read_html(StringIO(text), flavor="lxml")
 
-    except Exception:
+        st.write(f"MOPS form={form_id} table_count =", len(tables))
+
+        return tables
+
+    except Exception as e:
+        st.write(f"fetch_mops_tables error form={form_id}, y={roc_year}, q={season} -> {e}")
         return []
 
 def extract_income(mapping: dict):
@@ -1031,6 +1041,7 @@ if search_btn and code_input:
 
 else:
     st.write("✅ 這是 Raymond 的台股深度分析，請輸入股票代碼後點擊左側「開始分析」。")
+
 
 
 
