@@ -6,9 +6,10 @@ import numpy as np
 import pandas as pd
 import pandas_ta as ta
 import requests
+import urllib3
 import streamlit as st
 import google.generativeai as genai
-
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # =========================
 # Streamlit 基本設定
@@ -136,7 +137,9 @@ def get_all_names():
 
     for url, market in source_map:
         try:
-            tables = pd.read_html(url)
+            r = requests.get(url, headers=HEADERS, timeout=20, verify=False)
+            r.raise_for_status()
+            tables = pd.read_html(r.text)
             if not tables:
                 continue
             df = tables[0]
@@ -167,7 +170,7 @@ def get_stock_meta(code):
 def get_twse_month(code: str, yyyymm01: str) -> pd.DataFrame:
     url = "https://www.twse.com.tw/exchangeReport/STOCK_DAY"
     params = {"response": "json", "date": yyyymm01, "stockNo": code}
-    r = requests.get(url, params=params, headers=HEADERS, timeout=20)
+    r = requests.get(url, params=params, headers=HEADERS, timeout=20, verify=False)
     r.raise_for_status()
     js = r.json()
 
@@ -202,7 +205,7 @@ def get_tpex_month(code: str, roc_year_month: str) -> pd.DataFrame:
         "date": roc_year_month,
         "response": "json",
     }
-    r = requests.get(url, params=params, headers=HEADERS, timeout=20)
+    r = requests.get(url, params=params, headers=HEADERS, timeout=20, verify=False)
     r.raise_for_status()
     js = r.json()
 
@@ -284,7 +287,15 @@ def fetch_mops_tables(form_id: str, market: str, roc_year: int, season: int):
     }
 
     try:
-        return pd.read_html(url, data=payload)
+        r = requests.post(
+            url,
+            data=payload,
+            headers=HEADERS,
+            timeout=30,
+            verify=False
+        )
+        r.raise_for_status()
+        return pd.read_html(r.text)
     except Exception:
         return []
 
@@ -927,4 +938,5 @@ if search_btn and code_input:
 
 else:
     st.write("✅ 這是 Raymond 的台股深度分析，請輸入股票代碼後點擊左側「開始分析」。")
+
 
