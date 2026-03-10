@@ -250,8 +250,6 @@ def get_twse_month(code: str, yyyymm01: str) -> pd.DataFrame:
 
 
 def get_tpex_month(code: str, roc_year_month: str) -> pd.DataFrame:
-    # roc_year_month 例如 "114/03"
-    # TPEX 舊式結果頁：用 all quotes 後再篩股票代碼
     url = "https://www.tpex.org.tw/web/stock/aftertrading/otc_quotes_no1430/stk_wn1430_result.php"
     params = {
         "l": "zh-tw",
@@ -264,13 +262,13 @@ def get_tpex_month(code: str, roc_year_month: str) -> pd.DataFrame:
     try:
         r = requests.get(url, params=params, headers=HEADERS, timeout=20, verify=False)
         r.raise_for_status()
+
         text = r.text.strip()
         if not text:
             return pd.DataFrame()
 
         js = r.json()
 
-        # TPEX 這支有時是 aaData，有時是 tables/data，兩種都兼容
         data = js.get("aaData", [])
         if not data and "tables" in js:
             tables = js.get("tables", [])
@@ -280,27 +278,35 @@ def get_tpex_month(code: str, roc_year_month: str) -> pd.DataFrame:
         rows = []
         for row in data:
             try:
-                # 預期格式：日期, 代號, 名稱, 收盤, 漲跌, 開盤, 最高, 最低, 成交股數...
                 row_text = [str(x).strip() for x in row]
 
-                # 先判斷是不是目標股票
                 if code not in row_text:
                     continue
 
-                # 嘗試從列中找日期
-                raw_date = row_text[0]
-                if "/" in raw_date:
-                    dt = roc_to_ad_date(raw_date)
+                # 常見格式：代號, 名稱, 收盤, 漲跌, 開盤, 最高, 最低, 均價, 成交股數, 成交金額, ...
+                # 也可能是日期開頭格式，因此做兩種判斷
+                if "/" in row_text[0]:
+                    # 若第一欄就是日期
+                    dt = roc_to_ad_date(row_text[0])
+                    close_ = safe_float(row[3])
+                    open_ = safe_float(row[5])
+                    high_ = safe_float(row[6])
+                    low_ = safe_float(row[7])
+                    volume_ = safe_float(row[8])
                 else:
+                    # 若是月份總表，沒有逐日日期，直接略過
+                    continue
+
+                if pd.isna(dt):
                     continue
 
                 rows.append({
                     "Date": dt,
-                    "Open": safe_float(row[5]),
-                    "High": safe_float(row[6]),
-                    "Low": safe_float(row[7]),
-                    "Close": safe_float(row[3]),
-                    "Volume": safe_float(row[8]),
+                    "Open": open_,
+                    "High": high_,
+                    "Low": low_,
+                    "Close": close_,
+                    "Volume": volume_,
                 })
             except Exception:
                 continue
@@ -450,14 +456,29 @@ def get_financial_snapshots(code: str, market: str):
         income_tables = fetch_mops_tables("04", market, y, q)
         income_df = merge_statement_tables(income_tables)
         income_map = map_from_statement_table(income_df)
+        income_snaps.append({
+            "year": y,
+            "season": q,
+            "data": extract_income(income_map),
+        })
 
         balance_tables = fetch_mops_tables("05", market, y, q)
         balance_df = merge_statement_tables(balance_tables)
         balance_map = map_from_statement_table(balance_df)
+        balance_snaps.append({
+            "year": y,
+            "season": q,
+            "data": extract_balance(balance_map),
+        })
 
         cash_tables = fetch_mops_tables("20", market, y, q)
         cash_df = merge_statement_tables(cash_tables)
         cash_map = map_from_statement_table(cash_df)
+        cash_snaps.append({
+            "year": y,
+            "season": q,
+            "data": extract_cashflow(cash_map),
+        })
 
     return {
         "income": income_snaps,
@@ -1002,5 +1023,6 @@ if search_btn and code_input:
 
 else:
     st.write("✅ 這是 Raymond 的台股深度分析，請輸入股票代碼後點擊左側「開始分析」。")
+
 
 
