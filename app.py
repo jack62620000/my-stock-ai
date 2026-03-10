@@ -16,7 +16,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 # Streamlit 基本設定
 # =========================
 st.set_page_config(page_title="台股深度分析", layout="wide")
-
+st.cache_data.clear()
 HEADERS = {
     "User-Agent": "Mozilla/5.0",
     "Referer": "https://mops.twse.com.tw/",
@@ -531,14 +531,27 @@ def build_metrics(code: str):
     name = meta.get("name", code)
     market = meta.get("market")
 
+    st.write("偵錯｜meta =", meta)
+
     if market is None:
         market = "sii"
 
-    # 股價資料
+    st.write("偵錯｜market =", market)
+
     hist = get_price_history(code, market, months=12)
 
+    st.write("偵錯｜hist is None =", hist is None)
+    st.write("偵錯｜hist empty =", False if hist is None else hist.empty)
+    st.write("偵錯｜hist rows =", 0 if hist is None else len(hist))
+
     if hist is None or hist.empty:
+        st.error("build_metrics 在股價資料這一步就失敗了")
         return None
+        fin = get_financial_snapshots(code, market)
+        st.write("偵錯｜fin keys =", list(fin.keys()))
+        st.write("偵錯｜income len =", len(fin["income"]))
+        st.write("偵錯｜balance len =", len(fin["balance"]))
+        st.write("偵錯｜cash len =", len(fin["cash"]))
     df = hist.copy()
     df["ma5"] = ta.sma(df["Close"], 5)
     df["ma20"] = ta.sma(df["Close"], 20)
@@ -1040,6 +1053,7 @@ if search_btn and code_input:
 
 else:
     st.write("✅ 這是 Raymond 的台股深度分析，請輸入股票代碼後點擊左側「開始分析」。")
+
 
 
 
