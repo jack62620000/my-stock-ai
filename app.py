@@ -16,7 +16,6 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 # Streamlit 基本設定
 # =========================
 st.set_page_config(page_title="台股深度分析", layout="wide")
-st.cache_data.clear()
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0",
@@ -189,11 +188,6 @@ def get_twse_month(code: str, yyyymm01: str) -> pd.DataFrame:
 
         text = r.text.strip()
 
-        # 偵錯：看實際回了什麼
-        st.caption(f"TWSE status={r.status_code}")
-        st.caption(f"TWSE content-type={r.headers.get('Content-Type', '')}")
-        st.caption(f"TWSE 前80字={text[:80]}")
-
         # 空內容
         if not text:
             return pd.DataFrame()
@@ -225,7 +219,6 @@ def get_twse_month(code: str, yyyymm01: str) -> pd.DataFrame:
         return pd.DataFrame(rows)
 
     except Exception as e:
-        st.caption(f"get_twse_month 例外：{str(e)}")
         return pd.DataFrame()
 
 
@@ -293,9 +286,6 @@ def get_price_history(code: str, market: str, months: int = 12) -> pd.DataFrame:
         except Exception as e:
             debug_logs.append(f"錯誤: {str(e)}")
             continue
-
-    for msg in debug_logs[:30]:
-        st.caption(msg)
 
     if not dfs:
         return pd.DataFrame()
@@ -466,19 +456,8 @@ def build_metrics(code: str):
         market = "sii"
 
     # 股價
-    hist = get_price_history(code, market, months=12)
-    st.write("偵錯｜股票代碼：", code)
-    st.write("偵錯｜市場別：", market)
-    st.write("偵錯｜hist 是否為空：", hist is None or hist.empty)
-
-    if hist is not None and not hist.empty:
-        st.write("偵錯｜股價資料筆數：", len(hist))
-        st.dataframe(hist.tail())
-
     if hist is None or hist.empty:
-        st.error(f"抓不到股價資料：code={code}, market={market}")
         return None
-
     df = hist.copy()
     df["ma5"] = ta.sma(df["Close"], 5)
     df["ma20"] = ta.sma(df["Close"], 20)
@@ -972,6 +951,7 @@ if search_btn and code_input:
 
 else:
     st.write("✅ 這是 Raymond 的台股深度分析，請輸入股票代碼後點擊左側「開始分析」。")
+
 
 
 
