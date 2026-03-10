@@ -84,11 +84,67 @@ def keyword_value(mapping: dict, keywords):
             if kw in k:
                 return v
     return np.nan
+def normalize_text(x):
+    if x is None:
+        return ""
+    s = str(x)
+    s = s.replace("\u3000", " ")
+    s = s.replace("\xa0", " ")
+    s = s.replace(" ", "")
+    s = s.replace("\n", "")
+    return s.strip()
 
+
+def flatten_columns(df: pd.DataFrame) -> pd.DataFrame:
+    if df is None or df.empty:
+        return pd.DataFrame()
+
+    out = df.copy()
+
+    # MultiIndex columns -> 扁平化
+    if isinstance(out.columns, pd.MultiIndex):
+        out.columns = [
+            "_".join([str(x) for x in col if str(x) != "nan"]).strip("_")
+            for col in out.columns
+        ]
+    else:
+        out.columns = [str(c) for c in out.columns]
+
+    return out
+
+
+def find_row_first_number(df: pd.DataFrame, keywords):
+    """
+    在整張財報表中找包含關鍵字的列，
+    再從該列中找第一個可轉成數字的欄位。
+    """
+    if df is None or df.empty:
+        return np.nan
+
+    work = flatten_columns(df).fillna("")
+
+    for _, row in work.iterrows():
+        texts = [normalize_text(v) for v in row.tolist()]
+        row_text = "".join(texts)
+
+        if any(kw in row_text for kw in keywords):
+            for v in row.tolist():
+                f = safe_float(v)
+                if pd.notna(f):
+                    return f
+
+    return np.nan
 
 def map_from_statement_table(df: pd.DataFrame) -> dict:
+    """
+    保留原介面，但不再強依賴第一欄=科目名。
+    直接把整張表留在 dict 裡，後面 extract_* 直接從 raw_df 搜尋。
+    """
     if df is None or df.empty:
-        return {}
+        return {"_raw_df": pd.DataFrame()}
+
+    df = flatten_columns(df)
+    return {"_raw_df": df}
 
     result = {}
     for _, row in df.iterrows():
@@ -336,18 +392,27 @@ def fetch_mops_tables(form_id: str, market: str, roc_year: int, season: int):
         return []
 
 
-def extract_income(mapping: dict):
-    revenue = keyword_value(mapping, ["營業收入合計", "收入合計", "營業收入淨額", "營業收入"])
-    gross_profit_amt = keyword_value(mapping, ["營業毛利", "毛利"])
-    operating_income = keyword_value(mapping, ["營業利益", "營業淨利"])
-    net_income = keyword_value(mapping, ["本期淨利", "本期稅後淨利", "歸屬於母公司業主淨利", "淨利"])
-    eps = keyword_value(mapping, ["基本每股盈餘", "每股盈餘"])
+def extract_balance(mapping: dict):
+    df = mapping.get("_raw_df", pd.DataFrame())
+
+    total_assets = find_row_first_number(df, ["資產總計", "資產總額"])
+    total_liabilities = find_row_first_number(df, ["負債總計", "負債總額"])
+    equity = find_row_first_number(df, ["權益總計", "股東權益總計", "歸屬於母公司業主之權益合計"])
+    inventory = find_row_first_number(df, ["存貨"])
+    cash = find_row_first_number(df, ["現金及約當現金", "現金及約當現金合計"])
+    current_assets = find_row_first_number(df, ["流動資產合計", "流動資產總計"])
+    current_liabilities = find_row_first_number(df, ["流動負債合計", "流動負債總計"])
+    non_current_liabilities = find_row_first_number(df, ["非流動負債合計", "非流動負債總計"])
+
     return {
-        "revenue": revenue,
-        "gross_profit_amt": gross_profit_amt,
-        "operating_income": operating_income,
-        "net_income": net_income,
-        "eps": eps,
+        "total_assets": total_assets,
+        "total_liabilities": total_liabilities,
+        "equity": equity,
+        "inventory": inventory,
+        "cash": cash,
+        "current_assets": current_assets,
+        "current_liabilities": current_liabilities,
+        "non_current_liabilities": non_current_liabilities,
     }
 
 
@@ -373,14 +438,16 @@ def extract_balance(mapping: dict):
 
 
 def extract_cashflow(mapping: dict):
-    operating_cf = keyword_value(mapping, ["營業活動之淨現金流入", "營業活動之淨現金流量", "營業活動之淨現金流出"])
-    capex_raw = keyword_value(mapping, ["取得不動產、廠房及設備", "購置不動產、廠房及設備", "資本支出"])
+    df = mapping.get("_raw_df", pd.DataFrame())
+
+    operating_cf = find_row_first_number(df, ["營業活動之淨現金流入", "營業活動之淨現金流量", "營業活動之淨現金流出"])
+    capex_raw = find_row_first_number(df, ["取得不動產、廠房及設備", "購置不動產、廠房及設備", "資本支出"])
     capex = abs(capex_raw) if pd.notna(capex_raw) else np.nan
+
     return {
         "operating_cashflow": operating_cf,
         "capex": capex,
     }
-
 
 @st.cache_data(ttl=21600)
 def get_financial_snapshots(code: str, market: str):
@@ -973,6 +1040,7 @@ if search_btn and code_input:
 
 else:
     st.write("✅ 這是 Raymond 的台股深度分析，請輸入股票代碼後點擊左側「開始分析」。")
+
 
 
 
