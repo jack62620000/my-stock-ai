@@ -259,7 +259,7 @@ def get_tpex_month(code: str, roc_year_month: str) -> pd.DataFrame:
 
 
 @st.cache_data(ttl=3600)
-def get_price_history(code: str, market: str, months: int = 12) -> pd.DataFrame:
+def get_price_history(code: str, market: str, months: int = 6) -> pd.DataFrame:
     now = pd.Timestamp.today().normalize().replace(day=1)
     dfs = []
 
@@ -387,7 +387,7 @@ def get_financial_snapshots(code: str, market: str):
 
     periods = []
     y, q = roc_year, quarter
-    for _ in range(6):
+    for _ in range(2):
         periods.append((y, q))
         q -= 1
         if q == 0:
@@ -476,7 +476,7 @@ def build_metrics(code: str):
     if market is None:
         market = "sii"
 
-    hist = get_price_history(code, market, months=12)
+    hist = get_price_history(code, market, months=6)
 
     if hist is None or hist.empty:
         if market == "otc":
@@ -1033,3 +1033,4 @@ if search_btn and code_input:
 
 else:
     st.write("✅ 這是 Raymond 的台股深度分析，請輸入股票代碼後點擊左側「開始分析」。")
+
