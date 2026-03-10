@@ -244,6 +244,14 @@ def get_twse_month(code: str, yyyymm01: str) -> pd.DataFrame:
 
         js = r.json()
 
+        # 先看 TWSE 回來的結構
+        st.write("偵錯｜TWSE stat =", js.get("stat"))
+        st.write("偵錯｜TWSE keys =", list(js.keys()))
+        st.write("偵錯｜TWSE data 筆數 =", len(js.get("data", [])))
+
+        if js.get("data"):
+            st.write("偵錯｜TWSE 第一列原始資料 =", js["data"][0])
+
         if js.get("stat") != "OK":
             return pd.DataFrame()
 
@@ -251,46 +259,47 @@ def get_twse_month(code: str, yyyymm01: str) -> pd.DataFrame:
 
         for row in js.get("data", []):
             try:
-                # 新版 TWSE 日期格式直接用 pandas 解析最穩
-                raw_date = str(row[0]).strip().replace("年", "/").replace("月", "/").replace("日", "")
-                
-                # 先嘗試民國年格式 115/03/05
-                if "/" in raw_date:
-                    parts = raw_date.split("/")
-                    if len(parts) == 3:
-                        y, m, d = parts
-                        y = y.strip()
-                        m = m.strip()
-                        d = d.strip()
+                # 直接顯示日期原值
+                raw_date = str(row[0]).strip()
 
-                        # 民國年轉西元
-                        if len(y) <= 3:
-                            y = str(int(y) + 1911)
-
-                        dt = pd.Timestamp(f"{int(y):04d}-{int(m):02d}-{int(d):02d}")
-                    else:
-                        dt = pd.to_datetime(raw_date, errors="coerce")
+                # 民國日期格式：114/04/01
+                parts = raw_date.split("/")
+                if len(parts) == 3:
+                    y, m, d = parts
+                    if len(y) <= 3:
+                        y = str(int(y) + 1911)
+                    dt = pd.Timestamp(f"{int(y):04d}-{int(m):02d}-{int(d):02d}")
                 else:
                     dt = pd.to_datetime(raw_date, errors="coerce")
 
-                if pd.isna(dt):
-                    continue
+                open_ = safe_float(row[3])
+                high_ = safe_float(row[4])
+                low_ = safe_float(row[5])
+                close_ = safe_float(row[6])
+                volume_ = safe_float(row[1])
 
-                rows.append({
-                    "Date": dt,
-                    "Open": safe_float(row[3]),
-                    "High": safe_float(row[4]),
-                    "Low": safe_float(row[5]),
-                    "Close": safe_float(row[6]),
-                    "Volume": safe_float(row[1]),
-                })
+                # 如果日期正常，就加入，不要求 OHLC 一定都有值
+                if pd.notna(dt):
+                    rows.append({
+                        "Date": dt,
+                        "Open": open_,
+                        "High": high_,
+                        "Low": low_,
+                        "Close": close_,
+                        "Volume": volume_,
+                    })
+                else:
+                    st.write("偵錯｜日期解析失敗 =", row)
 
-            except Exception:
+            except Exception as e:
+                st.write("偵錯｜單列解析失敗 =", row, str(e))
                 continue
 
+        st.write("偵錯｜get_twse_month 成功筆數 =", len(rows))
         return pd.DataFrame(rows)
 
-    except Exception:
+    except Exception as e:
+        st.write("偵錯｜get_twse_month 整體失敗 =", str(e))
         return pd.DataFrame()
 
 def get_tpex_month(code: str, roc_year_month: str) -> pd.DataFrame:
@@ -1063,6 +1072,7 @@ if search_btn and code_input:
 
 else:
     st.write("✅ 這是 Raymond 的台股深度分析，請輸入股票代碼後點擊左側「開始分析」。")
+
 
 
 
