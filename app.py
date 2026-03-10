@@ -1,5 +1,3 @@
-import re
-import time
 from datetime import datetime
 
 import numpy as np
@@ -16,12 +14,11 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 # Streamlit 基本設定
 # =========================
 st.set_page_config(page_title="台股深度分析", layout="wide")
-st.cache_data.clear()
+
 HEADERS = {
     "User-Agent": "Mozilla/5.0",
     "Referer": "https://mops.twse.com.tw/",
 }
-
 
 # =========================
 # 共用工具
@@ -71,19 +68,13 @@ def calc_growth(cur, prev):
 
 def roc_to_ad_date(roc_date_str: str):
     yy, mm, dd = roc_date_str.split("/")
-    return pd.Timestamp(f"{int(yy)+1911}-{int(mm):02d}-{int(dd):02d}")
+    return pd.Timestamp(f"{int(yy) + 1911}-{int(mm):02d}-{int(dd):02d}")
 
 
 def ad_to_roc(year: int):
     return year - 1911
 
 
-def keyword_value(mapping: dict, keywords):
-    for k, v in mapping.items():
-        for kw in keywords:
-            if kw in k:
-                return v
-    return np.nan
 def normalize_text(x):
     if x is None:
         return ""
@@ -100,8 +91,6 @@ def flatten_columns(df: pd.DataFrame) -> pd.DataFrame:
         return pd.DataFrame()
 
     out = df.copy()
-
-    # MultiIndex columns -> 扁平化
     if isinstance(out.columns, pd.MultiIndex):
         out.columns = [
             "_".join([str(x) for x in col if str(x) != "nan"]).strip("_")
@@ -109,15 +98,10 @@ def flatten_columns(df: pd.DataFrame) -> pd.DataFrame:
         ]
     else:
         out.columns = [str(c) for c in out.columns]
-
     return out
 
 
 def find_row_first_number(df: pd.DataFrame, keywords):
-    """
-    在整張財報表中找包含關鍵字的列，
-    再從該列中找第一個可轉成數字的欄位。
-    """
     if df is None or df.empty:
         return np.nan
 
@@ -132,36 +116,13 @@ def find_row_first_number(df: pd.DataFrame, keywords):
                 f = safe_float(v)
                 if pd.notna(f):
                     return f
-
     return np.nan
 
+
 def map_from_statement_table(df: pd.DataFrame) -> dict:
-    """
-    保留原介面，但不再強依賴第一欄=科目名。
-    直接把整張表留在 dict 裡，後面 extract_* 直接從 raw_df 搜尋。
-    """
     if df is None or df.empty:
         return {"_raw_df": pd.DataFrame()}
-
-    df = flatten_columns(df)
-    return {"_raw_df": df}
-
-    result = {}
-    for _, row in df.iterrows():
-        try:
-            key = str(row.iloc[0]).strip()
-            if not key or key == "nan":
-                continue
-            val = np.nan
-            for item in row.iloc[1:].tolist():
-                f = safe_float(item)
-                if pd.notna(f):
-                    val = f
-                    break
-            result[key] = val
-        except Exception:
-            continue
-    return result
+    return {"_raw_df": flatten_columns(df)}
 
 
 def pick_company_table(tables, code):
@@ -200,6 +161,7 @@ def get_all_names():
             if not tables:
                 continue
             df = tables[0]
+
             for item in df.iloc[:, 0].astype(str):
                 if "　" in item:
                     p = item.split("　")
@@ -242,93 +204,78 @@ def get_twse_month(code: str, yyyymm01: str) -> pd.DataFrame:
         )
         r.raise_for_status()
 
+        text = r.text.strip()
+        if not text:
+            return pd.DataFrame()
+
         js = r.json()
-
-        # 先確認 TWSE 真的有回資料
-        st.write("偵錯｜TWSE stat =", js.get("stat"))
-        st.write("偵錯｜TWSE data 筆數 =", len(js.get("data", [])))
-
-        if js.get("data"):
-            st.write("偵錯｜TWSE 第一列原始資料 =", js["data"][0])
-
         if js.get("stat") != "OK":
             return pd.DataFrame()
 
         rows = []
-
         for row in js.get("data", []):
             try:
-                # 日期
                 raw_date = str(row[0]).strip()
                 y, m, d = raw_date.split("/")
                 dt = pd.Timestamp(f"{int(y) + 1911:04d}-{int(m):02d}-{int(d):02d}")
 
-                # 數值
-                open_ = safe_float(row[3])
-                high_ = safe_float(row[4])
-                low_ = safe_float(row[5])
-                close_ = safe_float(row[6])
-                volume_ = safe_float(row[1])
-
                 rows.append({
                     "Date": dt,
-                    "Open": open_,
-                    "High": high_,
-                    "Low": low_,
-                    "Close": close_,
-                    "Volume": volume_,
+                    "Open": safe_float(row[3]),
+                    "High": safe_float(row[4]),
+                    "Low": safe_float(row[5]),
+                    "Close": safe_float(row[6]),
+                    "Volume": safe_float(row[1]),
                 })
-
-            except Exception as e:
-                st.write("偵錯｜單列解析失敗 =", row)
-                st.write("偵錯｜失敗原因 =", str(e))
+            except Exception:
                 continue
 
-        st.write("偵錯｜get_twse_month 成功筆數 =", len(rows))
         return pd.DataFrame(rows)
 
-    except Exception as e:
-        st.write("偵錯｜get_twse_month 整體失敗 =", str(e))
+    except Exception:
         return pd.DataFrame()
 
+
 def get_tpex_month(code: str, roc_year_month: str) -> pd.DataFrame:
-    # 例: 114/03
     url = "https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQuotes"
     params = {
         "id": code,
         "date": roc_year_month,
         "response": "json",
     }
-    r = requests.get(url, params=params, headers=HEADERS, timeout=20, verify=False)
-    r.raise_for_status()
-    js = r.json()
 
-    tables = js.get("tables", [])
-    if not tables:
-        return pd.DataFrame()
+    try:
+        r = requests.get(url, params=params, headers=HEADERS, timeout=20, verify=False)
+        r.raise_for_status()
+        js = r.json()
 
-    data = tables[0].get("data", [])
-    rows = []
-    for row in data:
-        try:
-            dt = roc_to_ad_date(row[0].strip())
-            rows.append(
-                {
+        tables = js.get("tables", [])
+        if not tables:
+            return pd.DataFrame()
+
+        data = tables[0].get("data", [])
+        rows = []
+
+        for row in data:
+            try:
+                dt = roc_to_ad_date(row[0].strip())
+                rows.append({
                     "Date": dt,
                     "Open": safe_float(row[3]),
                     "High": safe_float(row[4]),
                     "Low": safe_float(row[5]),
                     "Close": safe_float(row[6]),
                     "Volume": safe_float(row[1]) * 1000,
-                }
-            )
-        except Exception:
-            continue
+                })
+            except Exception:
+                continue
 
-    return pd.DataFrame(rows)
+        return pd.DataFrame(rows)
+
+    except Exception:
+        return pd.DataFrame()
 
 
-@st.cache_data(ttl=3600)
 @st.cache_data(ttl=3600)
 def get_price_history(code: str, market: str, months: int = 12) -> pd.DataFrame:
     now = pd.Timestamp.today().normalize().replace(day=1)
@@ -336,28 +283,26 @@ def get_price_history(code: str, market: str, months: int = 12) -> pd.DataFrame:
 
     for i in range(months):
         dt = now - pd.DateOffset(months=i)
+        try:
+            if market == "sii":
+                yyyymm01 = dt.strftime("%Y%m01")
+                df = get_twse_month(code, yyyymm01)
+            else:
+                roc_ym = f"{ad_to_roc(dt.year)}/{dt.month:02d}"
+                df = get_tpex_month(code, roc_ym)
 
-        if market == "sii":
-            yyyymm01 = dt.strftime("%Y%m01")
-            st.write("偵錯｜TWSE 查詢月份 =", yyyymm01)
-            df = get_twse_month(code, yyyymm01)
-        else:
-            roc_ym = f"{ad_to_roc(dt.year)}/{dt.month:02d}"
-            st.write("偵錯｜TPEX 查詢月份 =", roc_ym)
-            df = get_tpex_month(code, roc_ym)
-
-        st.write("偵錯｜這個月筆數 =", len(df))
-
-        if not df.empty:
-            dfs.append(df)
+            if not df.empty:
+                dfs.append(df)
+        except Exception:
+            continue
 
     if not dfs:
-        st.error("get_price_history：12個月都沒有抓到任何股價資料")
         return pd.DataFrame()
 
     out = pd.concat(dfs, ignore_index=True)
     out = out.drop_duplicates(subset=["Date"]).sort_values("Date").reset_index(drop=True)
     return out
+
 
 # =========================
 # 財報：MOPS
@@ -380,23 +325,18 @@ def fetch_mops_tables(form_id: str, market: str, roc_year: int, season: int):
             data=payload,
             headers=HEADERS,
             timeout=30,
-            verify=False
+            verify=False,
         )
         r.raise_for_status()
 
         text = r.text.strip()
-
-        st.caption(f"MOPS form={form_id}, year={roc_year}, season={season}, 長度={len(text)}")
-        st.caption(f"MOPS 前80字={text[:80]}")
-
         if not text:
             return []
 
         tables = pd.read_html(text)
         return tables
 
-    except Exception as e:
-        st.caption(f"fetch_mops_tables 錯誤 form={form_id}, y={roc_year}, q={season}: {str(e)}")
+    except Exception:
         return []
 
 
@@ -453,6 +393,7 @@ def extract_cashflow(mapping: dict):
         "operating_cashflow": operating_cf,
         "capex": capex,
     }
+
 
 @st.cache_data(ttl=21600)
 def get_financial_snapshots(code: str, market: str):
@@ -536,27 +477,13 @@ def build_metrics(code: str):
     name = meta.get("name", code)
     market = meta.get("market")
 
-    st.write("偵錯｜meta =", meta)
-
     if market is None:
         market = "sii"
 
-    st.write("偵錯｜market =", market)
-
     hist = get_price_history(code, market, months=12)
-
-    st.write("偵錯｜hist is None =", hist is None)
-    st.write("偵錯｜hist empty =", False if hist is None else hist.empty)
-    st.write("偵錯｜hist rows =", 0 if hist is None else len(hist))
-
     if hist is None or hist.empty:
-        st.error("build_metrics 在股價資料這一步就失敗了")
         return None
-        fin = get_financial_snapshots(code, market)
-        st.write("偵錯｜fin keys =", list(fin.keys()))
-        st.write("偵錯｜income len =", len(fin["income"]))
-        st.write("偵錯｜balance len =", len(fin["balance"]))
-        st.write("偵錯｜cash len =", len(fin["cash"]))
+
     df = hist.copy()
     df["ma5"] = ta.sma(df["Close"], 5)
     df["ma20"] = ta.sma(df["Close"], 20)
@@ -599,12 +526,7 @@ def build_metrics(code: str):
         else np.nan
     )
 
-    # 財報
     fin = get_financial_snapshots(code, market)
-    
-    st.write("偵錯｜income 筆數：", len(fin["income"]))
-    st.write("偵錯｜balance 筆數：", len(fin["balance"]))
-    st.write("偵錯｜cash 筆數：", len(fin["cash"]))
 
     i0 = fin["income"][0]["data"] if len(fin["income"]) > 0 else {}
     i1 = fin["income"][1]["data"] if len(fin["income"]) > 1 else {}
@@ -615,10 +537,6 @@ def build_metrics(code: str):
     c0 = fin["cash"][0]["data"] if len(fin["cash"]) > 0 else {}
     c1 = fin["cash"][1]["data"] if len(fin["cash"]) > 1 else {}
 
-    st.write("偵錯｜最新損益表欄位：", i0)
-    st.write("偵錯｜最新資產負債表欄位：", b0)
-    st.write("偵錯｜最新現金流欄位：", c0)
-    
     revenue = i0.get("revenue", np.nan)
     gross_profit_amt = i0.get("gross_profit_amt", np.nan)
     operating_income = i0.get("operating_income", np.nan)
@@ -645,7 +563,11 @@ def build_metrics(code: str):
 
     operating_cashflow = c0.get("operating_cashflow", np.nan)
     capex = c0.get("capex", np.nan)
-    free_cashflow = operating_cashflow - capex if pd.notna(operating_cashflow) and pd.notna(capex) else np.nan
+    free_cashflow = (
+        operating_cashflow - capex
+        if pd.notna(operating_cashflow) and pd.notna(capex)
+        else np.nan
+    )
 
     operating_cashflow_prev = c1.get("operating_cashflow", np.nan)
     capex_prev = c1.get("capex", np.nan)
@@ -655,7 +577,6 @@ def build_metrics(code: str):
         else np.nan
     )
 
-    # 自行計算指標
     gross_profit = gross_profit_amt / revenue if pd.notna(gross_profit_amt) and pd.notna(revenue) and revenue != 0 else np.nan
     net_margin = net_income / revenue if pd.notna(net_income) and pd.notna(revenue) and revenue != 0 else np.nan
     op_margin = operating_income / revenue if pd.notna(operating_income) and pd.notna(revenue) and revenue != 0 else np.nan
@@ -683,7 +604,6 @@ def build_metrics(code: str):
     capex_to_cashflow = capex / operating_cashflow if pd.notna(capex) and pd.notna(operating_cashflow) and operating_cashflow != 0 else np.nan
     fcf_growth = calc_growth(free_cashflow, free_cashflow_prev)
 
-    # 先保留欄位，但官方免費不容易穩定取得的先顯示 N/A
     pe = np.nan
     pb = np.nan
     peg = np.nan
@@ -861,7 +781,6 @@ if search_btn and code_input:
                 volume_trend = "價跌量縮"
         r6.metric("盤中量價", volume_trend)
 
-    # 一、基本面
     st.header("📌 一、基本面：公司賺不賺錢")
     with st.container(border=True):
         st.subheader("盈利能力")
@@ -954,7 +873,6 @@ if search_btn and code_input:
         metric_with_status(v6, "現金股利報酬率", pct_text(cash_dividend_yield), None if pd.isna(cash_dividend_yield) else ("偏高⭐️" if cash_dividend_yield > 0.05 else "合理🟡" if cash_dividend_yield >= 0.02 else "偏低⚠️"))
         metric_with_status(v7, "帳面價值成長率", pct_text(book_value_growth), None if pd.isna(book_value_growth) else ("偏高⭐️" if book_value_growth > 0.08 else "合理🟡" if book_value_growth >= 0 else "偏低⚠️"))
 
-    # 二、技術面
     st.header("📉 二、技術面：股價趨勢與強度")
     with st.container(border=True):
         t1, t2, t3, t4 = st.columns(4)
@@ -1012,7 +930,6 @@ if search_btn and code_input:
         t4.metric("今日成交量", "N/A" if pd.isna(latest_vol) else f"{int(latest_vol):,}")
         t4.metric("量價關係", vpt)
 
-    # 三、財務與資本結構
     st.header("🏦 三、財務與資本結構：公司資本是否健康")
     with st.container(border=True):
         s1, s2, s3, s4 = st.columns(4)
@@ -1022,7 +939,6 @@ if search_btn and code_input:
         s4.metric("資本支出(Capex)", big_text(d.get("capex", np.nan), unit="億", divisor=1e8))
         st.metric("資本支出/營業現金流", num_text(d.get("capex_to_cashflow", np.nan), 2))
 
-    # 四、現金流與股利
     st.header("💵 四、現金流與股利：現金能不能穩定入袋")
     with st.container(border=True):
         f1, f2, f3, f4 = st.columns(4)
@@ -1034,7 +950,6 @@ if search_btn and code_input:
         st.write("• 若「自由現金流/股價」為正，代表每單位股價背後有現金流支撐。")
         st.write("• 若「盈餘配發率」接近 100%，代表大多數盈餘已配出。")
 
-    # 五、AI 診斷
     st.markdown("---")
     st.header("🤖 五、AI診斷")
     api_status = st.secrets.get("GEMINI_API_KEY", "")
@@ -1058,23 +973,3 @@ if search_btn and code_input:
 
 else:
     st.write("✅ 這是 Raymond 的台股深度分析，請輸入股票代碼後點擊左側「開始分析」。")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
