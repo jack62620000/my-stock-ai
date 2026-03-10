@@ -400,6 +400,24 @@ def fetch_mops_tables(form_id: str, market: str, roc_year: int, season: int):
         return []
 
 
+def extract_income(mapping: dict):
+    df = mapping.get("_raw_df", pd.DataFrame())
+
+    revenue = find_row_first_number(df, ["營業收入合計", "收入合計", "營業收入淨額", "營業收入"])
+    gross_profit_amt = find_row_first_number(df, ["營業毛利", "毛利"])
+    operating_income = find_row_first_number(df, ["營業利益", "營業淨利"])
+    net_income = find_row_first_number(df, ["本期淨利", "本期稅後淨利", "歸屬於母公司業主淨利", "淨利"])
+    eps = find_row_first_number(df, ["基本每股盈餘", "每股盈餘"])
+
+    return {
+        "revenue": revenue,
+        "gross_profit_amt": gross_profit_amt,
+        "operating_income": operating_income,
+        "net_income": net_income,
+        "eps": eps,
+    }
+
+
 def extract_balance(mapping: dict):
     df = mapping.get("_raw_df", pd.DataFrame())
 
@@ -412,27 +430,6 @@ def extract_balance(mapping: dict):
     current_liabilities = find_row_first_number(df, ["流動負債合計", "流動負債總計"])
     non_current_liabilities = find_row_first_number(df, ["非流動負債合計", "非流動負債總計"])
 
-    return {
-        "total_assets": total_assets,
-        "total_liabilities": total_liabilities,
-        "equity": equity,
-        "inventory": inventory,
-        "cash": cash,
-        "current_assets": current_assets,
-        "current_liabilities": current_liabilities,
-        "non_current_liabilities": non_current_liabilities,
-    }
-
-
-def extract_balance(mapping: dict):
-    total_assets = keyword_value(mapping, ["資產總計", "資產總額"])
-    total_liabilities = keyword_value(mapping, ["負債總計", "負債總額"])
-    equity = keyword_value(mapping, ["權益總計", "股東權益總計", "歸屬於母公司業主之權益合計"])
-    inventory = keyword_value(mapping, ["存貨"])
-    cash = keyword_value(mapping, ["現金及約當現金", "現金及約當現金合計"])
-    current_assets = keyword_value(mapping, ["流動資產合計", "流動資產總計"])
-    current_liabilities = keyword_value(mapping, ["流動負債合計", "流動負債總計"])
-    non_current_liabilities = keyword_value(mapping, ["非流動負債合計", "非流動負債總計"])
     return {
         "total_assets": total_assets,
         "total_liabilities": total_liabilities,
@@ -1061,6 +1058,7 @@ if search_btn and code_input:
 
 else:
     st.write("✅ 這是 Raymond 的台股深度分析，請輸入股票代碼後點擊左側「開始分析」。")
+
 
 
 
