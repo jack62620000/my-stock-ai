@@ -102,18 +102,18 @@ def get_deep_analysis_data(code):
             div_yield = info.get("dividendYield", np.nan)
             rev_growth = info.get("revenueGrowth", np.nan)
             eps_growth = info.get("earningsGrowth", np.nan)
-            gross_profit = info.get("grossMargins", 0)
-            net_margin = info.get("profitMargins", 0)
-            op_margin = info.get("operatingMargins", 0)
-            roe = info.get("returnOnEquity", 0)
-            roa = info.get("returnOnAssets", 0)
+            gross_profit = info.get("grossMargins", np.nan)
+            net_margin = info.get("profitMargins", np.nan)
+            op_margin = info.get("operatingMargins", np.nan)
+            roe = info.get("returnOnEquity", np.nan)
+            roa = info.get("returnOnAssets", np.nan)
 
             dte_raw = info.get("debtToEquity", np.nan)
             debt_to_equity = dte_raw / 100.0 if pd.notna(dte_raw) else np.nan
 
             current_ratio = info.get("currentRatio", np.nan)
             quick_ratio = info.get("quickRatio", np.nan)
-            payout_ratio = info.get("payoutRatio", 0)
+            payout_ratio = info.get("payoutRatio", np.nan)
             peg_ratio = info.get("pegRatio", np.nan)
             div_per_share = info.get("dividendRate", np.nan)
 
@@ -1006,5 +1006,6 @@ if search_btn and code_input:
         st.write("✅這是Raymond的台股深度分析，請輸入正確的股票代碼")
 else:
     st.write("✅這是Raymond的台股深度分析，請輸入股票代碼後點擊左側『開始分析』")
+
 
 
