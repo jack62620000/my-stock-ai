@@ -169,6 +169,7 @@ def get_stock_meta(code):
 # =========================
 def get_twse_month(code: str, yyyymm01: str) -> pd.DataFrame:
     url = "https://www.twse.com.tw/exchangeReport/STOCK_DAY"
+
     params = {
         "response": "json",
         "date": yyyymm01,
@@ -192,11 +193,12 @@ def get_twse_month(code: str, yyyymm01: str) -> pd.DataFrame:
 
         js = r.json()
 
-    if js.get("stat") != "OK":
+        if js.get("stat") != "OK":
             return pd.DataFrame()
 
         rows = []
-    for row in js["data"]:
+
+        for row in js["data"]:
             rows.append({
                 "Date": roc_to_ad_date(row[0]),
                 "Open": safe_float(row[3]),
@@ -208,7 +210,7 @@ def get_twse_month(code: str, yyyymm01: str) -> pd.DataFrame:
 
         return pd.DataFrame(rows)
 
-    except Exception:
+    except Exception as e:
         return pd.DataFrame()
 
 
@@ -953,6 +955,7 @@ if search_btn and code_input:
 
 else:
     st.write("✅ 這是 Raymond 的台股深度分析，請輸入股票代碼後點擊左側「開始分析」。")
+
 
 
 
