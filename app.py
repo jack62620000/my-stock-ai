@@ -169,32 +169,47 @@ def get_stock_meta(code):
 # =========================
 def get_twse_month(code: str, yyyymm01: str) -> pd.DataFrame:
     url = "https://www.twse.com.tw/exchangeReport/STOCK_DAY"
-    params = {"response": "json", "date": yyyymm01, "stockNo": code}
-    r = requests.get(url, params=params, headers=HEADERS, timeout=20, verify=False)
-    r.raise_for_status()
-    js = r.json()
+    params = {
+        "response": "json",
+        "date": yyyymm01,
+        "stockNo": code,
+    }
 
-    if js.get("stat") != "OK" or "data" not in js:
-        return pd.DataFrame()
+    try:
+        r = requests.get(
+            url,
+            params=params,
+            headers=HEADERS,
+            timeout=20,
+            verify=False
+        )
 
-    rows = []
+        r.raise_for_status()
+
+        # 如果不是 JSON 就直接回空
+        if "application/json" not in r.headers.get("Content-Type", ""):
+            return pd.DataFrame()
+
+        js = r.json()
+
+    if js.get("stat") != "OK":
+            return pd.DataFrame()
+
+        rows = []
     for row in js["data"]:
-        try:
-            dt = roc_to_ad_date(row[0].strip())
-            rows.append(
-                {
-                    "Date": dt,
-                    "Open": safe_float(row[3]),
-                    "High": safe_float(row[4]),
-                    "Low": safe_float(row[5]),
-                    "Close": safe_float(row[6]),
-                    "Volume": safe_float(row[1]),
-                }
-            )
-        except Exception:
-            continue
+            rows.append({
+                "Date": roc_to_ad_date(row[0]),
+                "Open": safe_float(row[3]),
+                "High": safe_float(row[4]),
+                "Low": safe_float(row[5]),
+                "Close": safe_float(row[6]),
+                "Volume": safe_float(row[1])
+            })
 
-    return pd.DataFrame(rows)
+        return pd.DataFrame(rows)
+
+    except Exception:
+        return pd.DataFrame()
 
 
 def get_tpex_month(code: str, roc_year_month: str) -> pd.DataFrame:
@@ -938,5 +953,6 @@ if search_btn and code_input:
 
 else:
     st.write("✅ 這是 Raymond 的台股深度分析，請輸入股票代碼後點擊左側「開始分析」。")
+
 
 
