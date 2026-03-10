@@ -1,5 +1,6 @@
 from datetime import datetime
 from io import StringIO
+
 import numpy as np
 import pandas as pd
 import pandas_ta as ta
@@ -14,7 +15,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 # Streamlit 基本設定
 # =========================
 st.set_page_config(page_title="台股深度分析", layout="wide")
-st.cache_data.clear()
+
 HEADERS = {
     "User-Agent": "Mozilla/5.0",
     "Referer": "https://mops.twse.com.tw/",
@@ -35,7 +36,7 @@ def safe_float(x):
                 .replace(")", "")
                 .strip()
             )
-            if x in ["", "-", "--", "N/A", "nan", "None"]:
+            if x in ["", "-", "--", "N/A", "nan", "None", ""]:
                 return np.nan
         return float(x)
     except Exception:
@@ -125,17 +126,6 @@ def map_from_statement_table(df: pd.DataFrame) -> dict:
     return {"_raw_df": flatten_columns(df)}
 
 
-def pick_company_table(tables, code):
-    code = str(code)
-    for tb in tables:
-        try:
-            text = "\n".join(tb.astype(str).fillna("").stack().tolist())
-            if code in text:
-                return tb.copy()
-        except Exception:
-            continue
-    return pd.DataFrame()
-    
 def merge_statement_tables(tables):
     frames = []
     for tb in tables:
@@ -149,6 +139,20 @@ def merge_statement_tables(tables):
         return pd.DataFrame()
 
     return pd.concat(frames, ignore_index=True)
+
+
+def first_two_non_empty_snapshots(snaps, keys):
+    out = []
+    for snap in snaps:
+        data = snap.get("data", {})
+        if any(pd.notna(data.get(k)) for k in keys):
+            out.append(data)
+        if len(out) == 2:
+            break
+    while len(out) < 2:
+        out.append({})
+    return out[0], out[1]
+
 
 # =========================
 # 股票基本清單
@@ -250,71 +254,9 @@ def get_twse_month(code: str, yyyymm01: str) -> pd.DataFrame:
 
 
 def get_tpex_month(code: str, roc_year_month: str) -> pd.DataFrame:
-    url = "https://www.tpex.org.tw/web/stock/aftertrading/otc_quotes_no1430/stk_wn1430_result.php"
-    params = {
-        "l": "zh-tw",
-        "o": "json",
-        "se": "EW",
-        "d": roc_year_month,
-        "s": "0,asc,0",
-    }
+    # 上櫃這段先保守處理；目前不穩定時回空表
+    return pd.DataFrame()
 
-    try:
-        r = requests.get(url, params=params, headers=HEADERS, timeout=20, verify=False)
-        r.raise_for_status()
-
-        text = r.text.strip()
-        if not text:
-            return pd.DataFrame()
-
-        js = r.json()
-
-        data = js.get("aaData", [])
-        if not data and "tables" in js:
-            tables = js.get("tables", [])
-            if tables:
-                data = tables[0].get("data", [])
-
-        rows = []
-        for row in data:
-            try:
-                row_text = [str(x).strip() for x in row]
-
-                if code not in row_text:
-                    continue
-
-                # 常見格式：代號, 名稱, 收盤, 漲跌, 開盤, 最高, 最低, 均價, 成交股數, 成交金額, ...
-                # 也可能是日期開頭格式，因此做兩種判斷
-                if "/" in row_text[0]:
-                    # 若第一欄就是日期
-                    dt = roc_to_ad_date(row_text[0])
-                    close_ = safe_float(row[3])
-                    open_ = safe_float(row[5])
-                    high_ = safe_float(row[6])
-                    low_ = safe_float(row[7])
-                    volume_ = safe_float(row[8])
-                else:
-                    # 若是月份總表，沒有逐日日期，直接略過
-                    continue
-
-                if pd.isna(dt):
-                    continue
-
-                rows.append({
-                    "Date": dt,
-                    "Open": open_,
-                    "High": high_,
-                    "Low": low_,
-                    "Close": close_,
-                    "Volume": volume_,
-                })
-            except Exception:
-                continue
-
-        return pd.DataFrame(rows)
-
-    except Exception:
-        return pd.DataFrame()
 
 @st.cache_data(ttl=3600)
 def get_price_history(code: str, market: str, months: int = 12) -> pd.DataFrame:
@@ -360,7 +302,6 @@ def fetch_mops_tables(form_id: str, market: str, roc_year: int, season: int):
     }
 
     try:
-        # 避免短時間連續打 MOPS 被回空頁 / 非表格頁
         import time
         time.sleep(0.4)
 
@@ -377,22 +318,11 @@ def fetch_mops_tables(form_id: str, market: str, roc_year: int, season: int):
         if not text:
             return []
 
-        # 不指定 flavor，讓 pandas 自己挑 parser，通常比硬鎖 lxml 穩
         return pd.read_html(StringIO(text), displayed_only=False)
 
     except Exception:
         return []
 
-        # 用 StringIO + lxml，比直接 read_html(text) 穩
-        tables = pd.read_html(StringIO(text), flavor="lxml")
-
-        st.write(f"MOPS form={form_id} table_count =", len(tables))
-
-        return tables
-
-    except Exception as e:
-        st.write(f"fetch_mops_tables error form={form_id}, y={roc_year}, q={season} -> {e}")
-        return []
 
 def extract_income(mapping: dict):
     df = mapping.get("_raw_df", pd.DataFrame())
@@ -471,10 +401,6 @@ def get_financial_snapshots(code: str, market: str):
     for y, q in periods:
         income_tables = fetch_mops_tables("04", market, y, q)
         income_df = merge_statement_tables(income_tables)
-
-        st.write("income_df columns =", income_df.columns.tolist()[:10])
-        st.dataframe(income_df.head(20))
-        
         income_map = map_from_statement_table(income_df)
         income_snaps.append({
             "year": y,
@@ -542,41 +468,18 @@ RSI {num_text(rsi)}，技術面多空由 MA5 / MA20 / MA60 趨勢判斷。
 # 核心：建立 UI 使用的 dict
 # =========================
 @st.cache_data(ttl=1800)
-def first_non_empty_snapshot(snaps, keys):
-    for snap in snaps:
-        data = snap.get("data", {})
-        if any(pd.notna(data.get(k)) for k in keys):
-            return data
-    return {}
-
-def first_two_non_empty_snapshots(snaps, keys):
-    out = []
-    for snap in snaps:
-        data = snap.get("data", {})
-        if any(pd.notna(data.get(k)) for k in keys):
-            out.append(data)
-        if len(out) == 2:
-            break
-    while len(out) < 2:
-        out.append({})
-    return out[0], out[1]
 def build_metrics(code: str):
     meta = get_stock_meta(code)
     name = meta.get("name", code)
     market = meta.get("market")
 
-    st.write("meta =", meta)
-
     if market is None:
         market = "sii"
-
-    st.write("market =", market)
 
     hist = get_price_history(code, market, months=12)
 
     if hist is None or hist.empty:
         if market == "otc":
-        # 上櫃股先不要整個報錯，先給空資料頁
             return {
                 "price": np.nan,
                 "name": name,
@@ -604,7 +507,7 @@ def build_metrics(code: str):
                 "peg": np.nan,
                 "dividend_yield": np.nan,
                 "payout_ratio": np.nan,
-                "df": pd.DataFrame(columns=["Date", "Open", "High", "Low", "Close", "Volume"]),
+                "df": pd.DataFrame(columns=["Date", "Open", "High", "Low", "Close", "Volume", "macd", "macd_signal", "std"]),
                 "rsi": np.nan,
                 "ma5": np.nan,
                 "ma20": np.nan,
@@ -634,7 +537,6 @@ def build_metrics(code: str):
                 "cash_dividend_yield": np.nan,
                 "book_value_growth": np.nan,
             }
-
         return None
 
     df = hist.copy()
@@ -685,19 +587,14 @@ def build_metrics(code: str):
         fin["income"],
         ["revenue", "gross_profit_amt", "operating_income", "net_income", "eps"],
     )
-
     b0, b1 = first_two_non_empty_snapshots(
         fin["balance"],
         ["total_assets", "total_liabilities", "equity"],
     )
-
     c0, c1 = first_two_non_empty_snapshots(
         fin["cash"],
         ["operating_cashflow", "capex"],
     )
-    st.write("i0 =", i0)
-    st.write("b0 =", b0)
-    st.write("c0 =", c0)
 
     revenue = i0.get("revenue", np.nan)
     gross_profit_amt = i0.get("gross_profit_amt", np.nan)
@@ -781,7 +678,6 @@ def build_metrics(code: str):
         "market": market,
         "price_change": price_change,
         "price_change_pct": price_change_pct,
-
         "gross_profit": gross_profit,
         "net_margin": net_margin,
         "op_margin": op_margin,
@@ -803,7 +699,6 @@ def build_metrics(code: str):
         "peg": peg,
         "dividend_yield": dividend_yield,
         "payout_ratio": payout_ratio,
-
         "df": df,
         "rsi": latest.get("rsi", np.nan),
         "ma5": latest.get("ma5", np.nan),
@@ -816,22 +711,18 @@ def build_metrics(code: str):
         "atr": latest.get("atr", np.nan),
         "high_52": df["High"].max() if "High" in df.columns else np.nan,
         "low_52": df["Low"].min() if "Low" in df.columns else np.nan,
-
         "total_assets": total_assets,
         "total_liabilities": total_liabilities,
         "equity": equity,
         "capex": capex,
         "capex_to_cashflow": capex_to_cashflow,
-
         "gross_profit_growth": gross_profit_growth,
         "operating_income_growth": operating_income_growth,
         "assets_growth": assets_growth,
         "equity_growth": equity_growth,
-
         "inv_asset_ratio": inv_asset_ratio,
         "cash_asset_ratio": cash_asset_ratio,
         "ncd_liabilities_ratio": ncd_liabilities_ratio,
-
         "fcf_revenue_ratio": fcf_revenue_ratio,
         "fcf_price_ratio": fcf_price_ratio,
         "fcf_growth": fcf_growth,
@@ -907,9 +798,15 @@ if search_btn and code_input:
         t1.metric("即時股價", num_text(price))
         t2.metric("漲跌額", "N/A" if pd.isna(change_price) else f"{change_price:+.1f}")
         t3.metric("漲跌幅", "N/A" if pd.isna(change_percent) else f"{change_percent:+.1f}%")
-        t4.metric("今日開盤", num_text(df["Open"].iloc[-1]))
-        t5.metric("今日高點", num_text(df["High"].iloc[-1]))
-        t6.metric("今日低點", num_text(df["Low"].iloc[-1]))
+
+        if not df.empty:
+            t4.metric("今日開盤", num_text(df["Open"].iloc[-1]))
+            t5.metric("今日高點", num_text(df["High"].iloc[-1]))
+            t6.metric("今日低點", num_text(df["Low"].iloc[-1]))
+        else:
+            t4.metric("今日開盤", "N/A")
+            t5.metric("今日高點", "N/A")
+            t6.metric("今日低點", "N/A")
 
         st.markdown("---")
 
@@ -922,11 +819,12 @@ if search_btn and code_input:
         r1.metric("RSI 趨勢", rsi_trend)
         r2.metric("即時 RSI", num_text(rsi_now))
 
-        macd_line = df["macd"].iloc[-1] if "macd" in df.columns else np.nan
-        macd_signal = df["macd_signal"].iloc[-1] if "macd_signal" in df.columns else np.nan
+        macd_line = df["macd"].iloc[-1] if (not df.empty and "macd" in df.columns) else np.nan
+        macd_signal = df["macd_signal"].iloc[-1] if (not df.empty and "macd_signal" in df.columns) else np.nan
         r3.metric("即時 MACD", "N/A" if pd.isna(macd_line) else f"{macd_line:+.2f}")
         r4.metric("MACD 信號線", "N/A" if pd.isna(macd_signal) else f"{macd_signal:+.2f}")
-        volume = df["Volume"].iloc[-1] if "Volume" in df.columns else np.nan
+
+        volume = df["Volume"].iloc[-1] if (not df.empty and "Volume" in df.columns) else np.nan
         r5.metric("成交量(張)", "N/A" if pd.isna(volume) else f"{int(volume / 1000):,}")
 
         volume_trend = "量價資訊不足"
@@ -1061,7 +959,7 @@ if search_btn and code_input:
         bb_lower = d.get("bb_lower", np.nan)
         high_52 = d.get("high_52", np.nan)
         low_52 = d.get("low_52", np.nan)
-        std_20 = df["std"].iloc[-1] if "std" in df.columns else np.nan
+        std_20 = df["std"].iloc[-1] if (not df.empty and "std" in df.columns) else np.nan
         atr = d.get("atr", np.nan)
 
         t3.metric("布林上軌", num_text(bb_upper))
@@ -1073,8 +971,8 @@ if search_btn and code_input:
         t3.metric("ATR(14日)", num_text(atr, 2))
 
         t4.subheader("成交量與量價關係")
-        latest_vol = df["Volume"].iloc[-1] if "Volume" in df.columns else np.nan
-        avg_vol = df["Volume"][-30:].mean() if "Volume" in df.columns and len(df) >= 30 else np.nan
+        latest_vol = df["Volume"].iloc[-1] if (not df.empty and "Volume" in df.columns) else np.nan
+        avg_vol = df["Volume"][-30:].mean() if (not df.empty and "Volume" in df.columns and len(df) >= 30) else np.nan
         if pd.notna(change_percent) and pd.notna(latest_vol) and pd.notna(avg_vol):
             if change_percent > 0 and latest_vol > avg_vol * 1.2:
                 vpt = "價漲量增"
@@ -1135,10 +1033,3 @@ if search_btn and code_input:
 
 else:
     st.write("✅ 這是 Raymond 的台股深度分析，請輸入股票代碼後點擊左側「開始分析」。")
-
-
-
-
-
-
-
