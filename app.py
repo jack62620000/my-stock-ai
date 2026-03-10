@@ -360,6 +360,10 @@ def fetch_mops_tables(form_id: str, market: str, roc_year: int, season: int):
     }
 
     try:
+        # 避免短時間連續打 MOPS 被回空頁 / 非表格頁
+        import time
+        time.sleep(0.4)
+
         r = requests.post(
             url,
             data=payload,
@@ -370,12 +374,14 @@ def fetch_mops_tables(form_id: str, market: str, roc_year: int, season: int):
         r.raise_for_status()
 
         text = r.text.strip()
-
-        st.write(f"MOPS form={form_id}, year={roc_year}, season={season}, len={len(text)}")
-        st.write("MOPS 前120字 =", text[:120])
-
         if not text:
             return []
+
+        # 不指定 flavor，讓 pandas 自己挑 parser，通常比硬鎖 lxml 穩
+        return pd.read_html(StringIO(text), displayed_only=False)
+
+    except Exception:
+        return []
 
         # 用 StringIO + lxml，比直接 read_html(text) 穩
         tables = pd.read_html(StringIO(text), flavor="lxml")
@@ -536,6 +542,24 @@ RSI {num_text(rsi)}，技術面多空由 MA5 / MA20 / MA60 趨勢判斷。
 # 核心：建立 UI 使用的 dict
 # =========================
 @st.cache_data(ttl=1800)
+def first_non_empty_snapshot(snaps, keys):
+    for snap in snaps:
+        data = snap.get("data", {})
+        if any(pd.notna(data.get(k)) for k in keys):
+            return data
+    return {}
+
+def first_two_non_empty_snapshots(snaps, keys):
+    out = []
+    for snap in snaps:
+        data = snap.get("data", {})
+        if any(pd.notna(data.get(k)) for k in keys):
+            out.append(data)
+        if len(out) == 2:
+            break
+    while len(out) < 2:
+        out.append({})
+    return out[0], out[1]
 def build_metrics(code: str):
     meta = get_stock_meta(code)
     name = meta.get("name", code)
@@ -550,11 +574,67 @@ def build_metrics(code: str):
 
     hist = get_price_history(code, market, months=12)
 
-    st.write("hist is None =", hist is None)
-    st.write("hist empty =", False if hist is None else hist.empty)
-    st.write("hist rows =", 0 if hist is None else len(hist))
-
     if hist is None or hist.empty:
+        if market == "otc":
+        # 上櫃股先不要整個報錯，先給空資料頁
+            return {
+                "price": np.nan,
+                "name": name,
+                "market": market,
+                "price_change": np.nan,
+                "price_change_pct": np.nan,
+                "gross_profit": np.nan,
+                "net_margin": np.nan,
+                "op_margin": np.nan,
+                "eps": np.nan,
+                "roe": np.nan,
+                "roa": np.nan,
+                "rev_growth": np.nan,
+                "eps_growth": np.nan,
+                "net_income_growth": np.nan,
+                "debt_ratio": np.nan,
+                "debt_to_equity": np.nan,
+                "current_ratio": np.nan,
+                "quick_ratio": np.nan,
+                "operating_cashflow": np.nan,
+                "free_cashflow": np.nan,
+                "cashflow_profit_ratio": np.nan,
+                "pe": np.nan,
+                "pb": np.nan,
+                "peg": np.nan,
+                "dividend_yield": np.nan,
+                "payout_ratio": np.nan,
+                "df": pd.DataFrame(columns=["Date", "Open", "High", "Low", "Close", "Volume"]),
+                "rsi": np.nan,
+                "ma5": np.nan,
+                "ma20": np.nan,
+                "ma60": np.nan,
+                "bias": np.nan,
+                "bb_upper": np.nan,
+                "bb_lower": np.nan,
+                "bb_mid": np.nan,
+                "atr": np.nan,
+                "high_52": np.nan,
+                "low_52": np.nan,
+                "total_assets": np.nan,
+                "total_liabilities": np.nan,
+                "equity": np.nan,
+                "capex": np.nan,
+                "capex_to_cashflow": np.nan,
+                "gross_profit_growth": np.nan,
+                "operating_income_growth": np.nan,
+                "assets_growth": np.nan,
+                "equity_growth": np.nan,
+                "inv_asset_ratio": np.nan,
+                "cash_asset_ratio": np.nan,
+                "ncd_liabilities_ratio": np.nan,
+                "fcf_revenue_ratio": np.nan,
+                "fcf_price_ratio": np.nan,
+                "fcf_growth": np.nan,
+                "cash_dividend_yield": np.nan,
+                "book_value_growth": np.nan,
+            }
+
         return None
 
     df = hist.copy()
@@ -601,15 +681,20 @@ def build_metrics(code: str):
 
     fin = get_financial_snapshots(code, market)
 
-    i0 = fin["income"][0]["data"] if len(fin["income"]) > 0 else {}
-    i1 = fin["income"][1]["data"] if len(fin["income"]) > 1 else {}
+    i0, i1 = first_two_non_empty_snapshots(
+        fin["income"],
+        ["revenue", "gross_profit_amt", "operating_income", "net_income", "eps"],
+    )
 
-    b0 = fin["balance"][0]["data"] if len(fin["balance"]) > 0 else {}
-    b1 = fin["balance"][1]["data"] if len(fin["balance"]) > 1 else {}
+    b0, b1 = first_two_non_empty_snapshots(
+        fin["balance"],
+        ["total_assets", "total_liabilities", "equity"],
+    )
 
-    c0 = fin["cash"][0]["data"] if len(fin["cash"]) > 0 else {}
-    c1 = fin["cash"][1]["data"] if len(fin["cash"]) > 1 else {}
-
+    c0, c1 = first_two_non_empty_snapshots(
+        fin["cash"],
+        ["operating_cashflow", "capex"],
+    )
     st.write("i0 =", i0)
     st.write("b0 =", b0)
     st.write("c0 =", c0)
@@ -1050,6 +1135,7 @@ if search_btn and code_input:
 
 else:
     st.write("✅ 這是 Raymond 的台股深度分析，請輸入股票代碼後點擊左側「開始分析」。")
+
 
 
 
