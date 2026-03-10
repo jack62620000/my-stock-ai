@@ -541,10 +541,19 @@ def build_metrics(code: str):
     name = meta.get("name", code)
     market = meta.get("market")
 
+    st.write("meta =", meta)
+
     if market is None:
         market = "sii"
 
+    st.write("market =", market)
+
     hist = get_price_history(code, market, months=12)
+
+    st.write("hist is None =", hist is None)
+    st.write("hist empty =", False if hist is None else hist.empty)
+    st.write("hist rows =", 0 if hist is None else len(hist))
+
     if hist is None or hist.empty:
         return None
 
@@ -1041,6 +1050,7 @@ if search_btn and code_input:
 
 else:
     st.write("✅ 這是 Raymond 的台股深度分析，請輸入股票代碼後點擊左側「開始分析」。")
+
 
 
 
