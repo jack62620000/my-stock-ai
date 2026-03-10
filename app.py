@@ -169,7 +169,6 @@ def get_stock_meta(code):
 # =========================
 def get_twse_month(code: str, yyyymm01: str) -> pd.DataFrame:
     url = "https://www.twse.com.tw/exchangeReport/STOCK_DAY"
-
     params = {
         "response": "json",
         "date": yyyymm01,
@@ -184,33 +183,47 @@ def get_twse_month(code: str, yyyymm01: str) -> pd.DataFrame:
             timeout=20,
             verify=False
         )
-
         r.raise_for_status()
 
-        # 如果不是 JSON 就直接回空
-        if "application/json" not in r.headers.get("Content-Type", ""):
+        text = r.text.strip()
+
+        # 偵錯：看實際回了什麼
+        st.caption(f"TWSE status={r.status_code}")
+        st.caption(f"TWSE content-type={r.headers.get('Content-Type', '')}")
+        st.caption(f"TWSE 前80字={text[:80]}")
+
+        # 空內容
+        if not text:
             return pd.DataFrame()
 
-        js = r.json()
+        # 不是 JSON 格式開頭
+        if not (text.startswith("{") or text.startswith("[")):
+            return pd.DataFrame()
+
+        # 只有在看起來像 JSON 時才解析
+        js = requests.models.complexjson.loads(text)
 
         if js.get("stat") != "OK":
             return pd.DataFrame()
 
         rows = []
-
-        for row in js["data"]:
-            rows.append({
-                "Date": roc_to_ad_date(row[0]),
-                "Open": safe_float(row[3]),
-                "High": safe_float(row[4]),
-                "Low": safe_float(row[5]),
-                "Close": safe_float(row[6]),
-                "Volume": safe_float(row[1])
-            })
+        for row in js.get("data", []):
+            try:
+                rows.append({
+                    "Date": roc_to_ad_date(row[0]),
+                    "Open": safe_float(row[3]),
+                    "High": safe_float(row[4]),
+                    "Low": safe_float(row[5]),
+                    "Close": safe_float(row[6]),
+                    "Volume": safe_float(row[1]),
+                })
+            except Exception:
+                continue
 
         return pd.DataFrame(rows)
 
     except Exception as e:
+        st.caption(f"get_twse_month 例外：{str(e)}")
         return pd.DataFrame()
 
 
@@ -955,6 +968,7 @@ if search_btn and code_input:
 
 else:
     st.write("✅ 這是 Raymond 的台股深度分析，請輸入股票代碼後點擊左側「開始分析」。")
+
 
 
 
