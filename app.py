@@ -225,40 +225,50 @@ def get_stock_meta(code):
 # 股價：TWSE / TPEX
 # =========================
 def get_twse_month(code: str, yyyymm01: str) -> pd.DataFrame:
-    url = "https://www.twse.com.tw/exchangeReport/STOCK_DAY"
+    url = "https://www.twse.com.tw/rwd/zh/afterTrading/STOCK_DAY"
     params = {
         "response": "json",
         "date": yyyymm01,
         "stockNo": code,
     }
 
-    r = requests.get(
-        url,
-        params=params,
-        headers=HEADERS,
-        timeout=20,
-        verify=False
-    )
-    r.raise_for_status()
-
-    text = r.text.strip()
-
-    st.write("偵錯｜TWSE status =", r.status_code)
-    st.write("偵錯｜TWSE content-type =", r.headers.get("Content-Type", ""))
-    st.write("偵錯｜TWSE 前60字 =", text[:60])
-
-    if not text:
-        st.error("get_twse_month：TWSE 回傳空字串")
-        return pd.DataFrame()
-
     try:
-        js = r.json()
-    except Exception as e:
-        st.error(f"get_twse_month：JSON 解析失敗：{e}")
-        return pd.DataFrame()
+        r = requests.get(
+            url,
+            params=params,
+            headers=HEADERS,
+            timeout=20,
+            verify=False
+        )
+        r.raise_for_status()
 
-    if js.get("stat") != "OK":
-        st.error(f"get_twse_month：TWSE stat != OK，實際為 {js.get('stat')}")
+        text = r.text.strip()
+
+        if not text:
+            return pd.DataFrame()
+
+        js = r.json()
+
+        if js.get("stat") != "OK":
+            return pd.DataFrame()
+
+        rows = []
+        for row in js.get("data", []):
+            try:
+                rows.append({
+                    "Date": roc_to_ad_date(row[0]),
+                    "Open": safe_float(row[3]),
+                    "High": safe_float(row[4]),
+                    "Low": safe_float(row[5]),
+                    "Close": safe_float(row[6]),
+                    "Volume": safe_float(row[1]),
+                })
+            except Exception:
+                continue
+
+        return pd.DataFrame(rows)
+
+    except Exception:
         return pd.DataFrame()
 
     rows = []
@@ -1050,6 +1060,7 @@ if search_btn and code_input:
 
 else:
     st.write("✅ 這是 Raymond 的台股深度分析，請輸入股票代碼後點擊左側「開始分析」。")
+
 
 
 
