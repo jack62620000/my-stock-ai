@@ -235,21 +235,30 @@ def get_tpex_month(code: str, roc_year_month: str) -> pd.DataFrame:
 def get_price_history(code: str, market: str, months: int = 12) -> pd.DataFrame:
     now = pd.Timestamp.today().normalize().replace(day=1)
     dfs = []
+    debug_logs = []
 
     for i in range(months):
         dt = now - pd.DateOffset(months=i)
         try:
             if market == "sii":
                 yyyymm01 = dt.strftime("%Y%m01")
+                debug_logs.append(f"TWSE 查詢月份: {yyyymm01}")
                 df = get_twse_month(code, yyyymm01)
             else:
                 roc_ym = f"{ad_to_roc(dt.year)}/{dt.month:02d}"
+                debug_logs.append(f"TPEX 查詢月份: {roc_ym}")
                 df = get_tpex_month(code, roc_ym)
 
+            debug_logs.append(f"這個月抓到 {len(df)} 筆")
             if not df.empty:
                 dfs.append(df)
-        except Exception:
+
+        except Exception as e:
+            debug_logs.append(f"錯誤: {str(e)}")
             continue
+
+    for msg in debug_logs[:30]:
+        st.caption(msg)
 
     if not dfs:
         return pd.DataFrame()
@@ -413,7 +422,16 @@ def build_metrics(code: str):
 
     # 股價
     hist = get_price_history(code, market, months=12)
+    st.write("偵錯｜股票代碼：", code)
+    st.write("偵錯｜市場別：", market)
+    st.write("偵錯｜hist 是否為空：", hist is None or hist.empty)
+
+    if hist is not None and not hist.empty:
+        st.write("偵錯｜股價資料筆數：", len(hist))
+        st.dataframe(hist.tail())
+
     if hist is None or hist.empty:
+        st.error(f"抓不到股價資料：code={code}, market={market}")
         return None
 
     df = hist.copy()
@@ -909,3 +927,4 @@ if search_btn and code_input:
 
 else:
     st.write("✅ 這是 Raymond 的台股深度分析，請輸入股票代碼後點擊左側「開始分析」。")
+
