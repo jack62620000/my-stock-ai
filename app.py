@@ -434,6 +434,124 @@ def get_financial_snapshots(code: str, market: str):
 
 
 # =========================
+#    財報
+@st.cache_data(ttl=21600)
+def build_financial_metrics(code: str, market: str):
+    fin = get_financial_snapshots(code, market)
+
+    i0, i1 = first_two_non_empty_snapshots(
+        fin["income"],
+        ["revenue", "gross_profit_amt", "operating_income", "net_income", "eps"],
+    )
+    b0, b1 = first_two_non_empty_snapshots(
+        fin["balance"],
+        ["total_assets", "total_liabilities", "equity"],
+    )
+    c0, c1 = first_two_non_empty_snapshots(
+        fin["cash"],
+        ["operating_cashflow", "capex"],
+    )
+
+    revenue = i0.get("revenue", np.nan)
+    gross_profit_amt = i0.get("gross_profit_amt", np.nan)
+    operating_income = i0.get("operating_income", np.nan)
+    net_income = i0.get("net_income", np.nan)
+    eps = i0.get("eps", np.nan)
+
+    revenue_prev = i1.get("revenue", np.nan)
+    gross_profit_prev = i1.get("gross_profit_amt", np.nan)
+    operating_income_prev = i1.get("operating_income", np.nan)
+    net_income_prev = i1.get("net_income", np.nan)
+    eps_prev = i1.get("eps", np.nan)
+
+    total_assets = b0.get("total_assets", np.nan)
+    total_liabilities = b0.get("total_liabilities", np.nan)
+    equity = b0.get("equity", np.nan)
+    inventory = b0.get("inventory", np.nan)
+    cash = b0.get("cash", np.nan)
+    current_assets = b0.get("current_assets", np.nan)
+    current_liabilities = b0.get("current_liabilities", np.nan)
+    non_current_liabilities = b0.get("non_current_liabilities", np.nan)
+
+    total_assets_prev = b1.get("total_assets", np.nan)
+    equity_prev = b1.get("equity", np.nan)
+
+    operating_cashflow = c0.get("operating_cashflow", np.nan)
+    capex = c0.get("capex", np.nan)
+    free_cashflow = (
+        operating_cashflow - capex
+        if pd.notna(operating_cashflow) and pd.notna(capex)
+        else np.nan
+    )
+
+    operating_cashflow_prev = c1.get("operating_cashflow", np.nan)
+    capex_prev = c1.get("capex", np.nan)
+    free_cashflow_prev = (
+        operating_cashflow_prev - capex_prev
+        if pd.notna(operating_cashflow_prev) and pd.notna(capex_prev)
+        else np.nan
+    )
+
+    gross_profit = gross_profit_amt / revenue if pd.notna(gross_profit_amt) and pd.notna(revenue) and revenue != 0 else np.nan
+    net_margin = net_income / revenue if pd.notna(net_income) and pd.notna(revenue) and revenue != 0 else np.nan
+    op_margin = operating_income / revenue if pd.notna(operating_income) and pd.notna(revenue) and revenue != 0 else np.nan
+    roe = net_income / equity if pd.notna(net_income) and pd.notna(equity) and equity != 0 else np.nan
+    roa = net_income / total_assets if pd.notna(net_income) and pd.notna(total_assets) and total_assets != 0 else np.nan
+
+    rev_growth = calc_growth(revenue, revenue_prev)
+    eps_growth = calc_growth(eps, eps_prev)
+    net_income_growth = calc_growth(net_income, net_income_prev)
+    gross_profit_growth = calc_growth(gross_profit_amt, gross_profit_prev)
+    operating_income_growth = calc_growth(operating_income, operating_income_prev)
+    assets_growth = calc_growth(total_assets, total_assets_prev)
+    equity_growth = calc_growth(equity, equity_prev)
+
+    debt_ratio = total_liabilities / total_assets if pd.notna(total_liabilities) and pd.notna(total_assets) and total_assets != 0 else np.nan
+    debt_to_equity = total_liabilities / equity if pd.notna(total_liabilities) and pd.notna(equity) and equity != 0 else np.nan
+    current_ratio = current_assets / current_liabilities if pd.notna(current_assets) and pd.notna(current_liabilities) and current_liabilities != 0 else np.nan
+    quick_ratio = (current_assets - inventory) / current_liabilities if pd.notna(current_assets) and pd.notna(inventory) and pd.notna(current_liabilities) and current_liabilities != 0 else np.nan
+    inv_asset_ratio = inventory / total_assets if pd.notna(inventory) and pd.notna(total_assets) and total_assets != 0 else np.nan
+    cash_asset_ratio = cash / total_assets if pd.notna(cash) and pd.notna(total_assets) and total_assets != 0 else np.nan
+    ncd_liabilities_ratio = non_current_liabilities / total_liabilities if pd.notna(non_current_liabilities) and pd.notna(total_liabilities) and total_liabilities != 0 else np.nan
+
+    cashflow_profit_ratio = operating_cashflow / net_income if pd.notna(operating_cashflow) and pd.notna(net_income) and net_income != 0 else np.nan
+    fcf_revenue_ratio = free_cashflow / revenue if pd.notna(free_cashflow) and pd.notna(revenue) and revenue != 0 else np.nan
+    capex_to_cashflow = capex / operating_cashflow if pd.notna(capex) and pd.notna(operating_cashflow) and operating_cashflow != 0 else np.nan
+    fcf_growth = calc_growth(free_cashflow, free_cashflow_prev)
+
+    return {
+        "gross_profit": gross_profit,
+        "net_margin": net_margin,
+        "op_margin": op_margin,
+        "eps": eps,
+        "roe": roe,
+        "roa": roa,
+        "rev_growth": rev_growth,
+        "eps_growth": eps_growth,
+        "net_income_growth": net_income_growth,
+        "debt_ratio": debt_ratio,
+        "debt_to_equity": debt_to_equity,
+        "current_ratio": current_ratio,
+        "quick_ratio": quick_ratio,
+        "operating_cashflow": operating_cashflow,
+        "free_cashflow": free_cashflow,
+        "cashflow_profit_ratio": cashflow_profit_ratio,
+        "total_assets": total_assets,
+        "total_liabilities": total_liabilities,
+        "equity": equity,
+        "capex": capex,
+        "capex_to_cashflow": capex_to_cashflow,
+        "gross_profit_growth": gross_profit_growth,
+        "operating_income_growth": operating_income_growth,
+        "assets_growth": assets_growth,
+        "equity_growth": equity_growth,
+        "inv_asset_ratio": inv_asset_ratio,
+        "cash_asset_ratio": cash_asset_ratio,
+        "ncd_liabilities_ratio": ncd_liabilities_ratio,
+        "fcf_revenue_ratio": fcf_revenue_ratio,
+        "fcf_growth": fcf_growth,
+        "book_value_growth": equity_growth,
+    }
 # AI 報告
 # =========================
 @st.cache_data(ttl=86400)
@@ -581,60 +699,38 @@ def build_metrics(code: str):
         else np.nan
     )
 
-    fin = get_financial_snapshots(code, market)
+    # 財報先不在這裡抓，改成按鈕載入
+    revenue = np.nan
+    gross_profit_amt = np.nan
+    operating_income = np.nan
+    net_income = np.nan
+    eps = np.nan
 
-    i0, i1 = first_two_non_empty_snapshots(
-        fin["income"],
-        ["revenue", "gross_profit_amt", "operating_income", "net_income", "eps"],
-    )
-    b0, b1 = first_two_non_empty_snapshots(
-        fin["balance"],
-        ["total_assets", "total_liabilities", "equity"],
-    )
-    c0, c1 = first_two_non_empty_snapshots(
-        fin["cash"],
-        ["operating_cashflow", "capex"],
-    )
+    revenue_prev = np.nan
+    gross_profit_prev = np.nan
+    operating_income_prev = np.nan
+    net_income_prev = np.nan
+    eps_prev = np.nan
 
-    revenue = i0.get("revenue", np.nan)
-    gross_profit_amt = i0.get("gross_profit_amt", np.nan)
-    operating_income = i0.get("operating_income", np.nan)
-    net_income = i0.get("net_income", np.nan)
-    eps = i0.get("eps", np.nan)
+    total_assets = np.nan
+    total_liabilities = np.nan
+    equity = np.nan
+    inventory = np.nan
+    cash = np.nan
+    current_assets = np.nan
+    current_liabilities = np.nan
+    non_current_liabilities = np.nan
 
-    revenue_prev = i1.get("revenue", np.nan)
-    gross_profit_prev = i1.get("gross_profit_amt", np.nan)
-    operating_income_prev = i1.get("operating_income", np.nan)
-    net_income_prev = i1.get("net_income", np.nan)
-    eps_prev = i1.get("eps", np.nan)
+    total_assets_prev = np.nan
+    equity_prev = np.nan
 
-    total_assets = b0.get("total_assets", np.nan)
-    total_liabilities = b0.get("total_liabilities", np.nan)
-    equity = b0.get("equity", np.nan)
-    inventory = b0.get("inventory", np.nan)
-    cash = b0.get("cash", np.nan)
-    current_assets = b0.get("current_assets", np.nan)
-    current_liabilities = b0.get("current_liabilities", np.nan)
-    non_current_liabilities = b0.get("non_current_liabilities", np.nan)
+    operating_cashflow = np.nan
+    capex = np.nan
+    free_cashflow = np.nan
 
-    total_assets_prev = b1.get("total_assets", np.nan)
-    equity_prev = b1.get("equity", np.nan)
-
-    operating_cashflow = c0.get("operating_cashflow", np.nan)
-    capex = c0.get("capex", np.nan)
-    free_cashflow = (
-        operating_cashflow - capex
-        if pd.notna(operating_cashflow) and pd.notna(capex)
-        else np.nan
-    )
-
-    operating_cashflow_prev = c1.get("operating_cashflow", np.nan)
-    capex_prev = c1.get("capex", np.nan)
-    free_cashflow_prev = (
-        operating_cashflow_prev - capex_prev
-        if pd.notna(operating_cashflow_prev) and pd.notna(capex_prev)
-        else np.nan
-    )
+    operating_cashflow_prev = np.nan
+    capex_prev = np.nan
+    free_cashflow_prev = np.nan
 
     gross_profit = gross_profit_amt / revenue if pd.notna(gross_profit_amt) and pd.notna(revenue) and revenue != 0 else np.nan
     net_margin = net_income / revenue if pd.notna(net_income) and pd.notna(revenue) and revenue != 0 else np.nan
@@ -777,7 +873,16 @@ h3 {
 if search_btn and code_input:
     with st.spinner(f"🔄 分析 {code_input} 資料中..."):
         d = build_metrics(code_input)
+    financial_data = {}
 
+    st.markdown("---")
+    st.subheader("📥 載入財報資料")
+
+    if st.button("📊 載入基本面 / 財務 / 現金流", use_container_width=True):
+        with st.spinner(f"📊 載入 {code_input} 財報資料中..."):
+            financial_data = build_financial_metrics(code_input, d["market"])
+    else:
+        financial_data = {}
     if not d:
         st.error("查不到資料，請確認股票代碼是否正確。")
         st.stop()
@@ -846,13 +951,13 @@ if search_btn and code_input:
         st.subheader("盈利能力")
         c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
 
-        gp = d.get("gross_profit", np.nan)
-        nm = d.get("net_margin", np.nan)
-        om = d.get("op_margin", np.nan)
-        eps = d.get("eps", np.nan)
-        roe = d.get("roe", np.nan)
-        roa = d.get("roa", np.nan)
-        eps_growth = d.get("eps_growth", np.nan)
+        gp = financial_data.get("gross_profit", d.get("gross_profit", np.nan))
+        nm = financial_data.get("net_margin", d.get("net_margin", np.nan))
+        om = financial_data.get("op_margin", d.get("op_margin", np.nan))
+        eps = financial_data.get("eps", d.get("eps", np.nan))
+        roe = financial_data.get("roe", d.get("roe", np.nan))
+        roa = financial_data.get("roa", d.get("roa", np.nan))
+        eps_growth = financial_data.get("eps_growth", d.get("eps_growth", np.nan))
 
         metric_with_status(c1, "毛利率", pct_text(gp), None if pd.isna(gp) else ("偏高⭐️" if gp > 0.3 else "合理🟡" if gp >= 0.2 else "偏低⚠️"))
         metric_with_status(c2, "淨利率", pct_text(nm), None if pd.isna(nm) else ("偏高⭐️" if nm > 0.08 else "合理🟡" if nm >= 0.04 else "偏低⚠️"))
@@ -864,12 +969,12 @@ if search_btn and code_input:
 
         st.subheader("成長性")
         g1, g2, g3, g4, g5, g6, g7 = st.columns(7)
-        rev_growth = d.get("rev_growth", np.nan)
-        net_income_growth = d.get("net_income_growth", np.nan)
-        gross_profit_growth = d.get("gross_profit_growth", np.nan)
-        op_income_growth = d.get("operating_income_growth", np.nan)
-        assets_growth = d.get("assets_growth", np.nan)
-        equity_growth = d.get("equity_growth", np.nan)
+        rev_growth = financial_data.get("rev_growth", d.get("rev_growth", np.nan))
+        net_income_growth = financial_data.get("net_income_growth", d.get("net_income_growth", np.nan))
+        gross_profit_growth = financial_data.get("gross_profit_growth", d.get("gross_profit_growth", np.nan))
+        op_income_growth = financial_data.get("operating_income_growth", d.get("operating_income_growth", np.nan))
+        assets_growth = financial_data.get("assets_growth", d.get("assets_growth", np.nan))
+        equity_growth = financial_data.get("equity_growth", d.get("equity_growth", np.nan))
 
         metric_with_status(g1, "營收成長率", pct_text(rev_growth), None if pd.isna(rev_growth) else ("偏高⭐️" if rev_growth > 0.10 else "合理🟡" if rev_growth >= 0 else "偏低⚠️"))
         metric_with_status(g2, "EPS 成長率", pct_text(eps_growth), None if pd.isna(eps_growth) else ("偏高⭐️" if eps_growth > 0.10 else "合理🟡" if eps_growth >= 0 else "偏低⚠️"))
@@ -881,13 +986,13 @@ if search_btn and code_input:
 
         st.subheader("財務結構")
         f1, f2, f3, f4, f5, f6, f7 = st.columns(7)
-        debt_ratio = d.get("debt_ratio", np.nan)
-        debt_to_equity = d.get("debt_to_equity", np.nan)
-        current_ratio = d.get("current_ratio", np.nan)
-        quick_ratio = d.get("quick_ratio", np.nan)
-        inv_asset_ratio = d.get("inv_asset_ratio", np.nan)
-        cash_asset_ratio = d.get("cash_asset_ratio", np.nan)
-        ncd_liabilities_ratio = d.get("ncd_liabilities_ratio", np.nan)
+        debt_ratio = financial_data.get("debt_ratio", d.get("debt_ratio", np.nan))
+        debt_to_equity = financial_data.get("debt_to_equity", d.get("debt_to_equity", np.nan))
+        current_ratio = financial_data.get("current_ratio", d.get("current_ratio", np.nan))
+        quick_ratio = financial_data.get("quick_ratio", d.get("quick_ratio", np.nan))
+        inv_asset_ratio = financial_data.get("inv_asset_ratio", d.get("inv_asset_ratio", np.nan))
+        cash_asset_ratio = financial_data.get("cash_asset_ratio", d.get("cash_asset_ratio", np.nan))
+        ncd_liabilities_ratio = financial_data.get("ncd_liabilities_ratio", d.get("ncd_liabilities_ratio", np.nan))
 
         metric_with_status(f1, "負債比率", pct_text(debt_ratio), None if pd.isna(debt_ratio) else ("低風險⭐️" if debt_ratio < 0.5 else "中等🟡" if debt_ratio <= 0.7 else "高風險⚠️"))
         metric_with_status(f2, "負債/股東權益", pct_text(debt_to_equity), None if pd.isna(debt_to_equity) else ("低風險⭐️" if debt_to_equity < 0.5 else "中等🟡" if debt_to_equity <= 1 else "高風險⚠️"))
@@ -899,13 +1004,12 @@ if search_btn and code_input:
 
         st.subheader("現金流品質")
         ca1, ca2, ca3, ca4, ca5, ca6, ca7 = st.columns(7)
-        operating_cashflow = d.get("operating_cashflow", np.nan)
-        free_cashflow = d.get("free_cashflow", np.nan)
-        cashflow_profit_ratio = d.get("cashflow_profit_ratio", np.nan)
-        fcf_revenue_ratio = d.get("fcf_revenue_ratio", np.nan)
-        fcf_price_ratio = d.get("fcf_price_ratio", np.nan)
-        fcf_growth = d.get("fcf_growth", np.nan)
-        capex_to_cashflow = d.get("capex_to_cashflow", np.nan)
+        operating_cashflow = financial_data.get("operating_cashflow", d.get("operating_cashflow", np.nan))
+        free_cashflow = financial_data.get("free_cashflow", d.get("free_cashflow", np.nan))
+        cashflow_profit_ratio = financial_data.get("cashflow_profit_ratio", d.get("cashflow_profit_ratio", np.nan))
+        fcf_revenue_ratio = financial_data.get("fcf_revenue_ratio", d.get("fcf_revenue_ratio", np.nan))
+        fcf_growth = financial_data.get("fcf_growth", d.get("fcf_growth", np.nan))
+        capex_to_cashflow = financial_data.get("capex_to_cashflow", d.get("capex_to_cashflow", np.nan))
 
         ca1.metric("營業現金流", big_text(operating_cashflow))
         ca2.metric("自由現金流(FCF)", big_text(free_cashflow))
@@ -993,18 +1097,18 @@ if search_btn and code_input:
     st.header("🏦 三、財務與資本結構：公司資本是否健康")
     with st.container(border=True):
         s1, s2, s3, s4 = st.columns(4)
-        s1.metric("總資產", big_text(d.get("total_assets", np.nan), unit="億", divisor=1e8))
-        s2.metric("總負債", big_text(d.get("total_liabilities", np.nan), unit="億", divisor=1e8))
-        s3.metric("股東權益", big_text(d.get("equity", np.nan), unit="億", divisor=1e8))
-        s4.metric("資本支出(Capex)", big_text(d.get("capex", np.nan), unit="億", divisor=1e8))
-        st.metric("資本支出/營業現金流", num_text(d.get("capex_to_cashflow", np.nan), 2))
+        s1.metric("總資產", big_text(financial_data.get("total_assets", d.get("total_assets", np.nan)), unit="億", divisor=1e8))
+        s2.metric("總負債", big_text(financial_data.get("total_liabilities", d.get("total_liabilities", np.nan)), unit="億", divisor=1e8))
+        s3.metric("股東權益", big_text(financial_data.get("equity", d.get("equity", np.nan)), unit="億", divisor=1e8))
+        s4.metric("資本支出(Capex)", big_text(financial_data.get("capex", d.get("capex", np.nan)), unit="億", divisor=1e8))
+        st.metric("資本支出/營業現金流", num_text(financial_data.get("capex_to_cashflow", d.get("capex_to_cashflow", np.nan)), 2))
 
     st.header("💵 四、現金流與股利：現金能不能穩定入袋")
     with st.container(border=True):
         f1, f2, f3, f4 = st.columns(4)
-        f1.metric("自由現金流/營收", pct_text(d.get("fcf_revenue_ratio", np.nan)))
+        f1.metric("自由現金流/營收", pct_text(financial_data.get("fcf_revenue_ratio", d.get("fcf_revenue_ratio", np.nan))))
         f2.metric("自由現金流/股價", pct_text(d.get("fcf_price_ratio", np.nan)))
-        f3.metric("FCF成長率", pct_text(d.get("fcf_growth", np.nan)))
+        f3.metric("FCF成長率", pct_text(financial_data.get("fcf_growth", d.get("fcf_growth", np.nan))))
         f4.metric("盈餘配發率", pct_text(d.get("payout_ratio", np.nan)))
         st.write("說明：")
         st.write("• 若「自由現金流/股價」為正，代表每單位股價背後有現金流支撐。")
@@ -1033,4 +1137,5 @@ if search_btn and code_input:
 
 else:
     st.write("✅ 這是 Raymond 的台股深度分析，請輸入股票代碼後點擊左側「開始分析」。")
+
 
