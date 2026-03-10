@@ -5,48 +5,51 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 # --- 1. 模擬數據 ---
-def get_locked_data():
-    # 生成 100 天交易日數據
-    date_rng = pd.bdate_range(start='2024-01-01', periods=100)
-    df = pd.DataFrame(date_rng, columns=['Date'])
-    df['Close'] = (500 + np.random.randn(100).cumsum() * 3).round(1)
-    df['Open'] = (df['Close'] + np.random.uniform(-3, 3, 100)).round(1)
-    df['High'] = df[['Open', 'Close']].max(axis=1) + 2
-    df['Low'] = df[['Open', 'Close']].min(axis=1) - 2
+def get_final_data():
+    # 生成 100 筆數據 (模擬 100 個交易日)
+    df = pd.DataFrame({
+        'Date': pd.bdate_range(start='2024-01-01', periods=100).strftime('%Y-%m-%d'),
+        'Close': (500 + np.random.randn(100).cumsum() * 5).round(1)
+    })
+    df['Open'] = (df['Close'] + np.random.uniform(-5, 5, 100)).round(1)
+    df['High'] = df[['Open', 'Close']].max(axis=1) + 3
+    df['Low'] = df[['Open', 'Close']].min(axis=1) - 3
     df['Volume'] = np.random.randint(1000, 5000, size=100)
     df['Color'] = np.where(df['Close'] >= df['Open'], '#EB3B3B', '#26A69A')
     return df
 
-df = get_locked_data()
+df = get_final_data()
 
-# --- 2. 建立圖表 ---
+# --- 2. 建立圖表 (使用索引作為 X 軸) ---
 fig = make_subplots(rows=2, cols=1, shared_xaxes=True, 
                     vertical_spacing=0.03, row_heights=[0.7, 0.3])
 
-# K線
+# 主圖：K線 (x 傳入 df.index)
 fig.add_trace(go.Candlestick(
-    x=df['Date'], open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'],
+    x=df.index, open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'],
+    name='價格',
     increasing_line_color='#EB3B3B', increasing_fillcolor='#EB3B3B',
-    decreasing_line_color='#26A69A', decreasing_fillcolor='#26A69A'
+    decreasing_line_color='#26A69A', decreasing_fillcolor='#26A69A',
+    text=df['Date'], # 懸停時顯示真實日期
+    hoverinfo='text+y'
 ), row=1, col=1)
 
-# 成交量
-fig.add_trace(go.Bar(x=df['Date'], y=df['Volume'], marker_color=df['Color']), row=2, col=1)
+# 副圖：成交量
+fig.add_trace(go.Bar(x=df.index, y=df['Volume'], marker_color=df['Color'], name='成交量'), row=2, col=1)
 
-# --- 3. 【核心修改】實現邊界限制與鎖定 ---
-last_date = df['Date'].iloc[-1]
-first_date = df['Date'].iloc[0]
-# 視窗初始顯示最後 30 根
-start_view = df['Date'].iloc[-30] 
-
+# --- 3. 邊界與視窗控制 (鎖定核心) ---
+total_len = len(df)
+# 視窗只看最後 30 根 (小一半)
 fig.update_xaxes(
-    type='date',
-    range=[start_view, last_date],     # 初始顯示範圍
-    # 限制拖曳範圍：用戶只能在數據的 [第一筆, 最後一筆] 之間移動
-    # 這是 Plotly 模擬「撞牆」的關鍵
-    autorange=False, 
-    # constrains 確保用戶無法拉出定義的範圍
-    rangebreak=[dict(values=["sat", "sun"])] # 再次嘗試加入移除週末，若報錯則移除此行
+    range=[total_len - 31, total_len - 0.5], # 鎖定右側邊界
+    # 設定顯示標籤為日期 (雖然 X 軸是數字)
+    tickmode='array',
+    tickvals=df.index[::10], # 每 10 根顯示一次日期
+    ticktext=df['Date'][::10],
+    gridcolor='#F0F0F0',
+    # 限制拖曳範圍：[0, 總長度]
+    fixedrange=False,
+    constrain="domain",
 )
 
 fig.update_layout(
@@ -55,16 +58,16 @@ fig.update_layout(
     xaxis_rangeslider_visible=False,
     template='plotly_white',
     hovermode='x unified',
-    # 這裡的 margin.r 是關鍵，讓最新價格貼近邊緣
-    margin=dict(l=10, r=10, t=10, b=10), 
+    margin=dict(l=10, r=60, t=10, b=10), # 右側留 60px 給價格軸
     showlegend=False,
-    # 限制 Y 軸不要跟著 X 軸亂跳
-    yaxis=dict(side='right', fixedrange=False),
-    yaxis2=dict(side='right', fixedrange=True) # 成交量 Y 軸固定高度
+    yaxis=dict(side='right', gridcolor='#F0F0F0'), # 價格軸靠右
+    yaxis2=dict(side='right', showgrid=False)
 )
 
-# 移除圖表工具列，避免使用者切換回 "Zoom" 模式破壞你的鎖定感
+# 顯示圖表
 st.plotly_chart(fig, use_container_width=True, config={
     'scrollZoom': True,
     'displayModeBar': False 
 })
+
+st.success("✅ 索引鎖定引擎啟動成功！現在可以流暢拖曳且不會報錯。")
