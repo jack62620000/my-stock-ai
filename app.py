@@ -15,7 +15,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 # Streamlit 基本設定
 # =========================
 st.set_page_config(page_title="台股深度分析", layout="wide")
-
+st.set_page_config
 HEADERS = {
     "User-Agent": "Mozilla/5.0",
     "Referer": "https://mops.twse.com.tw/",
@@ -272,6 +272,7 @@ def get_price_history(code: str, market: str, months: int = 12) -> pd.DataFrame:
 
     for i in range(months):
         dt = now - pd.DateOffset(months=i)
+
         try:
             if market == "sii":
                 yyyymm01 = dt.strftime("%Y%m01")
@@ -283,6 +284,7 @@ def get_price_history(code: str, market: str, months: int = 12) -> pd.DataFrame:
                 df = get_tpex_month(code, roc_ym)
 
             debug_logs.append(f"這個月抓到 {len(df)} 筆")
+
             if not df.empty:
                 dfs.append(df)
 
@@ -968,6 +970,7 @@ if search_btn and code_input:
 
 else:
     st.write("✅ 這是 Raymond 的台股深度分析，請輸入股票代碼後點擊左側「開始分析」。")
+
 
 
 
