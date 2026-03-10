@@ -9,13 +9,15 @@ import requests
 import urllib3
 import streamlit as st
 import google.generativeai as genai
+
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # =========================
 # Streamlit 基本設定
 # =========================
 st.set_page_config(page_title="台股深度分析", layout="wide")
-st.set_page_config
+st.cache_data.clear()
+
 HEADERS = {
     "User-Agent": "Mozilla/5.0",
     "Referer": "https://mops.twse.com.tw/",
@@ -970,6 +972,7 @@ if search_btn and code_input:
 
 else:
     st.write("✅ 這是 Raymond 的台股深度分析，請輸入股票代碼後點擊左側「開始分析」。")
+
 
 
 
