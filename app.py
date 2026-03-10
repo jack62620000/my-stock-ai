@@ -135,7 +135,20 @@ def pick_company_table(tables, code):
         except Exception:
             continue
     return pd.DataFrame()
+    
+def merge_statement_tables(tables):
+    frames = []
+    for tb in tables:
+        try:
+            if tb is not None and not tb.empty:
+                frames.append(flatten_columns(tb))
+        except Exception:
+            continue
 
+    if not frames:
+        return pd.DataFrame()
+
+    return pd.concat(frames, ignore_index=True)
 
 # =========================
 # 股票基本清單
@@ -237,35 +250,57 @@ def get_twse_month(code: str, yyyymm01: str) -> pd.DataFrame:
 
 
 def get_tpex_month(code: str, roc_year_month: str) -> pd.DataFrame:
-    url = "https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQuotes"
+    # roc_year_month 例如 "114/03"
+    # TPEX 舊式結果頁：用 all quotes 後再篩股票代碼
+    url = "https://www.tpex.org.tw/web/stock/aftertrading/otc_quotes_no1430/stk_wn1430_result.php"
     params = {
-        "id": code,
-        "date": roc_year_month,
-        "response": "json",
+        "l": "zh-tw",
+        "o": "json",
+        "se": "EW",
+        "d": roc_year_month,
+        "s": "0,asc,0",
     }
 
     try:
         r = requests.get(url, params=params, headers=HEADERS, timeout=20, verify=False)
         r.raise_for_status()
-        js = r.json()
-
-        tables = js.get("tables", [])
-        if not tables:
+        text = r.text.strip()
+        if not text:
             return pd.DataFrame()
 
-        data = tables[0].get("data", [])
-        rows = []
+        js = r.json()
 
+        # TPEX 這支有時是 aaData，有時是 tables/data，兩種都兼容
+        data = js.get("aaData", [])
+        if not data and "tables" in js:
+            tables = js.get("tables", [])
+            if tables:
+                data = tables[0].get("data", [])
+
+        rows = []
         for row in data:
             try:
-                dt = roc_to_ad_date(row[0].strip())
+                # 預期格式：日期, 代號, 名稱, 收盤, 漲跌, 開盤, 最高, 最低, 成交股數...
+                row_text = [str(x).strip() for x in row]
+
+                # 先判斷是不是目標股票
+                if code not in row_text:
+                    continue
+
+                # 嘗試從列中找日期
+                raw_date = row_text[0]
+                if "/" in raw_date:
+                    dt = roc_to_ad_date(raw_date)
+                else:
+                    continue
+
                 rows.append({
                     "Date": dt,
-                    "Open": safe_float(row[3]),
-                    "High": safe_float(row[4]),
-                    "Low": safe_float(row[5]),
-                    "Close": safe_float(row[6]),
-                    "Volume": safe_float(row[1]) * 1000,
+                    "Open": safe_float(row[5]),
+                    "High": safe_float(row[6]),
+                    "Low": safe_float(row[7]),
+                    "Close": safe_float(row[3]),
+                    "Volume": safe_float(row[8]),
                 })
             except Exception:
                 continue
@@ -274,7 +309,6 @@ def get_tpex_month(code: str, roc_year_month: str) -> pd.DataFrame:
 
     except Exception:
         return pd.DataFrame()
-
 
 @st.cache_data(ttl=3600)
 def get_price_history(code: str, market: str, months: int = 12) -> pd.DataFrame:
@@ -328,17 +362,12 @@ def fetch_mops_tables(form_id: str, market: str, roc_year: int, season: int):
             verify=False,
         )
         r.raise_for_status()
-
         text = r.text.strip()
         if not text:
             return []
-
-        tables = pd.read_html(text)
-        return tables
-
+         return pd.read_html(text)
     except Exception:
         return []
-
 
 def extract_income(mapping: dict):
     df = mapping.get("_raw_df", pd.DataFrame())
@@ -416,19 +445,16 @@ def get_financial_snapshots(code: str, market: str):
 
     for y, q in periods:
         income_tables = fetch_mops_tables("04", market, y, q)
-        income_df = pick_company_table(income_tables, code)
+        income_df = merge_statement_tables(income_tables)
         income_map = map_from_statement_table(income_df)
-        income_snaps.append({"year": y, "season": q, "data": extract_income(income_map)})
 
         balance_tables = fetch_mops_tables("05", market, y, q)
-        balance_df = pick_company_table(balance_tables, code)
+        balance_df = merge_statement_tables(balance_tables)
         balance_map = map_from_statement_table(balance_df)
-        balance_snaps.append({"year": y, "season": q, "data": extract_balance(balance_map)})
 
         cash_tables = fetch_mops_tables("20", market, y, q)
-        cash_df = pick_company_table(cash_tables, code)
+        cash_df = merge_statement_tables(cash_tables)
         cash_map = map_from_statement_table(cash_df)
-        cash_snaps.append({"year": y, "season": q, "data": extract_cashflow(cash_map)})
 
     return {
         "income": income_snaps,
@@ -765,7 +791,7 @@ if search_btn and code_input:
         r3.metric("即時 MACD", "N/A" if pd.isna(macd_line) else f"{macd_line:+.2f}")
         r4.metric("MACD 信號線", "N/A" if pd.isna(macd_signal) else f"{macd_signal:+.2f}")
         volume = df["Volume"].iloc[-1] if "Volume" in df.columns else np.nan
-        r5.metric("成交量(股)", "N/A" if pd.isna(volume) else f"{int(volume):,}")
+        r5.metric("成交量(張)", "N/A" if pd.isna(volume) else f"{int(volume / 1000):,}")
 
         volume_trend = "量價資訊不足"
         if len(df) >= 2:
@@ -927,7 +953,7 @@ if search_btn and code_input:
         else:
             vpt = "量價資訊不足"
 
-        t4.metric("今日成交量", "N/A" if pd.isna(latest_vol) else f"{int(latest_vol):,}")
+        t4.metric("今日成交量(張)", "N/A" if pd.isna(latest_vol) else f"{int(latest_vol / 1000):,}")
         t4.metric("量價關係", vpt)
 
     st.header("🏦 三、財務與資本結構：公司資本是否健康")
@@ -973,3 +999,4 @@ if search_btn and code_input:
 
 else:
     st.write("✅ 這是 Raymond 的台股深度分析，請輸入股票代碼後點擊左側「開始分析」。")
+
