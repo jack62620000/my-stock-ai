@@ -225,7 +225,6 @@ def get_stock_meta(code):
 # 股價：TWSE / TPEX
 # =========================
 def get_twse_month(code: str, yyyymm01: str) -> pd.DataFrame:
-    # 改回你前面實測可正常回 JSON 的舊路徑
     url = "https://www.twse.com.tw/exchangeReport/STOCK_DAY"
     params = {
         "response": "json",
@@ -243,37 +242,53 @@ def get_twse_month(code: str, yyyymm01: str) -> pd.DataFrame:
         )
         r.raise_for_status()
 
-        text = r.text.strip()
-        if not text:
-            return pd.DataFrame()
-
         js = r.json()
+
+        # 先確認 TWSE 真的有回資料
+        st.write("偵錯｜TWSE stat =", js.get("stat"))
+        st.write("偵錯｜TWSE data 筆數 =", len(js.get("data", [])))
+
+        if js.get("data"):
+            st.write("偵錯｜TWSE 第一列原始資料 =", js["data"][0])
 
         if js.get("stat") != "OK":
             return pd.DataFrame()
 
         rows = []
+
         for row in js.get("data", []):
             try:
-                # 民國日期格式：114/04/01
+                # 日期
                 raw_date = str(row[0]).strip()
                 y, m, d = raw_date.split("/")
                 dt = pd.Timestamp(f"{int(y) + 1911:04d}-{int(m):02d}-{int(d):02d}")
 
+                # 數值
+                open_ = safe_float(row[3])
+                high_ = safe_float(row[4])
+                low_ = safe_float(row[5])
+                close_ = safe_float(row[6])
+                volume_ = safe_float(row[1])
+
                 rows.append({
                     "Date": dt,
-                    "Open": safe_float(row[3]),
-                    "High": safe_float(row[4]),
-                    "Low": safe_float(row[5]),
-                    "Close": safe_float(row[6]),
-                    "Volume": safe_float(row[1]),
+                    "Open": open_,
+                    "High": high_,
+                    "Low": low_,
+                    "Close": close_,
+                    "Volume": volume_,
                 })
-            except Exception:
+
+            except Exception as e:
+                st.write("偵錯｜單列解析失敗 =", row)
+                st.write("偵錯｜失敗原因 =", str(e))
                 continue
 
+        st.write("偵錯｜get_twse_month 成功筆數 =", len(rows))
         return pd.DataFrame(rows)
 
-    except Exception:
+    except Exception as e:
+        st.write("偵錯｜get_twse_month 整體失敗 =", str(e))
         return pd.DataFrame()
 
 def get_tpex_month(code: str, roc_year_month: str) -> pd.DataFrame:
@@ -1046,6 +1061,7 @@ if search_btn and code_input:
 
 else:
     st.write("✅ 這是 Raymond 的台股深度分析，請輸入股票代碼後點擊左側「開始分析」。")
+
 
 
 
