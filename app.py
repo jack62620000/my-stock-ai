@@ -14,7 +14,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 # Streamlit 基本設定
 # =========================
 st.set_page_config(page_title="台股深度分析", layout="wide")
-
+st.cache_data.clear()
 HEADERS = {
     "User-Agent": "Mozilla/5.0",
     "Referer": "https://mops.twse.com.tw/",
@@ -455,6 +455,10 @@ def get_financial_snapshots(code: str, market: str):
     for y, q in periods:
         income_tables = fetch_mops_tables("04", market, y, q)
         income_df = merge_statement_tables(income_tables)
+
+        st.write("income_df columns =", income_df.columns.tolist()[:10])
+        st.dataframe(income_df.head(20))
+        
         income_map = map_from_statement_table(income_df)
         income_snaps.append({
             "year": y,
@@ -586,6 +590,10 @@ def build_metrics(code: str):
 
     c0 = fin["cash"][0]["data"] if len(fin["cash"]) > 0 else {}
     c1 = fin["cash"][1]["data"] if len(fin["cash"]) > 1 else {}
+
+    st.write("i0 =", i0)
+    st.write("b0 =", b0)
+    st.write("c0 =", c0)
 
     revenue = i0.get("revenue", np.nan)
     gross_profit_amt = i0.get("gross_profit_amt", np.nan)
@@ -1023,6 +1031,7 @@ if search_btn and code_input:
 
 else:
     st.write("✅ 這是 Raymond 的台股深度分析，請輸入股票代碼後點擊左側「開始分析」。")
+
 
 
 
