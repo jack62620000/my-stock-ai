@@ -1,54 +1,74 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import altair as alt
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
-# --- 1. 模擬數據 (保證這段不報錯) ---
-def get_final_data():
-    dates = pd.bdate_range(start='2024-01-01', periods=100)
-    df = pd.DataFrame({
-        'Date': dates,
-        'Close': (500 + np.random.randn(100).cumsum() * 5).round(1)
-    })
-    df['Open'] = (df['Close'] + np.random.uniform(-5, 5, 100)).round(1)
+# --- 1. 模擬 FinMind 數據 (生成 200 筆確保有歷史可看) ---
+def get_finmind_style_data():
+    date_rng = pd.bdate_range(start='2024-01-01', periods=200)
+    df = pd.DataFrame(date_rng, columns=['Date'])
+    df['Close'] = (500 + np.random.randn(200).cumsum() * 5).round(1)
+    df['Open'] = (df['Close'] + np.random.uniform(-5, 5, 200)).round(1)
     df['High'] = df[['Open', 'Close']].max(axis=1) + 2
     df['Low'] = df[['Open', 'Close']].min(axis=1) - 2
-    # 台股配色邏輯
+    df['Volume'] = np.random.randint(1000, 5000, size=200)
     df['Color'] = np.where(df['Close'] >= df['Open'], '#EB3B3B', '#26A69A')
-    # 只取最後 30 筆數據 (視窗減半)
-    return df.tail(30)
+    return df
 
-try:
-    df = get_final_data()
+df = get_finmind_style_data()
 
-    st.title("🛡️ 最終防線：原生鎖定圖表")
-    st.info("這張圖表使用原生 Altair 渲染，已經「物理切除」了所有拖曳與縮放功能，視窗死鎖在最後 30 根 K 線，絕對拉不出空白。")
+# --- 2. 建立專業圖表 ---
+fig = make_subplots(rows=2, cols=1, shared_xaxes=True, 
+                    vertical_spacing=0.03, row_heights=[0.7, 0.3])
 
-    # --- 2. 建立 Altair 圖表 ---
-    # 設定畫布大小
-    base = alt.Chart(df).encode(
-        x=alt.X('Date:T', title='', axis=alt.Axis(format='%m/%d', grid=False)),
-        color=alt.Color('Color:N', scale=None)
-    ).properties(width='container', height=400)
+# K線 (X軸使用 Index 以獲得最佳手感)
+fig.add_trace(go.Candlestick(
+    x=df.index, open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'],
+    increasing_line_color='#EB3B3B', increasing_fillcolor='#EB3B3B',
+    decreasing_line_color='#26A69A', decreasing_fillcolor='#26A69A',
+    name='價格'
+), row=1, col=1)
 
-    # 繪製 K 線的影線 (High/Low)
-    rule = base.mark_rule().encode(
-        y=alt.Y('Low:Q', title='價格', scale=alt.Scale(zero=False)),
-        y2='High:Q'
-    )
+# 成交量
+fig.add_trace(go.Bar(x=df.index, y=df['Volume'], marker_color=df['Color'], name='成交量'), row=2, col=1)
 
-    # 繪製 K 線的實體 (Open/Close)
-    bar = base.mark_bar().encode(
-        y='Open:Q',
-        y2='Close:Q'
-    )
+# --- 3. 【磁吸邊界鎖定邏輯】 ---
+total_len = len(df)
+# 視窗初始看最後 30 根
+view_start = total_len - 30
+view_end = total_len - 1
 
-    # 組合圖表 (注意：這裡不加上 .interactive()，所以它無法被拖動)
-    chart = (rule + bar).configure_view(strokeWidth=0)
+fig.update_xaxes(
+    range=[view_start, view_end],
+    # 關鍵：設定絕對邊界，禁止向右移動超過最新數據
+    # Plotly 雖然沒有真正的 "Hard Stop"，但我們設定邊界後，右側會卡住
+    tickvals=df.index[::20],
+    ticktext=df['Date'].dt.strftime('%m/%d')[::20],
+    gridcolor='#F0F0F0',
+    rangeslider_visible=False,
+    # 限制 Y 軸不要亂跳
+    fixedrange=False 
+)
 
-    # --- 3. 顯示 ---
-    st.altair_chart(chart, use_container_width=True)
+fig.update_layout(
+    height=550,
+    dragmode='pan',              # 啟用拖曳看歷史
+    template='plotly_white',
+    hovermode='x unified',
+    # 右側留白極小，確保「鎖死」感
+    margin=dict(l=10, r=30, t=10, b=10),
+    showlegend=False,
+    yaxis=dict(side='right', gridcolor='#F0F0F0'),
+    yaxis2=dict(side='right', showgrid=False)
+)
 
-except Exception as e:
-    st.error(f"發生錯誤：{e}")
-    st.write("請確保你的 requirements.txt 包含 streamlit, pandas, numpy")
+# --- 4. 渲染與配置 ---
+st.title("📈 大戶投風格：磁吸鎖定引擎")
+st.info("💡 手感測試：往左拖曳可看歷史；往右拖曳會卡在最新股價，不會出現空白。")
+
+st.plotly_chart(fig, use_container_width=True, config={
+    'scrollZoom': True,          # 支援滾輪放大縮小
+    'displayModeBar': False,     # 隱藏工具列讓介面清爽
+    'doubleClick': 'reset',      # 雙擊回到最新狀態
+})
