@@ -225,7 +225,8 @@ def get_stock_meta(code):
 # 股價：TWSE / TPEX
 # =========================
 def get_twse_month(code: str, yyyymm01: str) -> pd.DataFrame:
-    url = "https://www.twse.com.tw/rwd/zh/afterTrading/STOCK_DAY"
+    # 改回你前面實測可正常回 JSON 的舊路徑
+    url = "https://www.twse.com.tw/exchangeReport/STOCK_DAY"
     params = {
         "response": "json",
         "date": yyyymm01,
@@ -239,30 +240,14 @@ def get_twse_month(code: str, yyyymm01: str) -> pd.DataFrame:
             headers=HEADERS,
             timeout=20,
             verify=False,
-            allow_redirects=True,
         )
         r.raise_for_status()
 
         text = r.text.strip()
-
-        st.write("偵錯｜TWSE final url =", r.url)
-        st.write("偵錯｜TWSE status =", r.status_code)
-        st.write("偵錯｜TWSE content-type =", r.headers.get("Content-Type", ""))
-        st.write("偵錯｜TWSE 前100字 =", text[:100])
-
-        # 不是 JSON 就直接回空表
         if not text:
-            st.write("偵錯｜TWSE 回傳空字串")
             return pd.DataFrame()
 
-        if not (text.startswith("{") or text.startswith("[")):
-            st.write("偵錯｜TWSE 回傳不是 JSON")
-            return pd.DataFrame()
-
-        js = requests.models.complexjson.loads(text)
-
-        st.write("偵錯｜TWSE stat =", js.get("stat"))
-        st.write("偵錯｜TWSE data 筆數 =", len(js.get("data", [])))
+        js = r.json()
 
         if js.get("stat") != "OK":
             return pd.DataFrame()
@@ -270,19 +255,10 @@ def get_twse_month(code: str, yyyymm01: str) -> pd.DataFrame:
         rows = []
         for row in js.get("data", []):
             try:
+                # 民國日期格式：114/04/01
                 raw_date = str(row[0]).strip()
-                parts = raw_date.split("/")
-
-                if len(parts) == 3:
-                    y, m, d = parts
-                    if len(y) <= 3:
-                        y = str(int(y) + 1911)
-                    dt = pd.Timestamp(f"{int(y):04d}-{int(m):02d}-{int(d):02d}")
-                else:
-                    dt = pd.to_datetime(raw_date, errors="coerce")
-
-                if pd.isna(dt):
-                    continue
+                y, m, d = raw_date.split("/")
+                dt = pd.Timestamp(f"{int(y) + 1911:04d}-{int(m):02d}-{int(d):02d}")
 
                 rows.append({
                     "Date": dt,
@@ -292,15 +268,12 @@ def get_twse_month(code: str, yyyymm01: str) -> pd.DataFrame:
                     "Close": safe_float(row[6]),
                     "Volume": safe_float(row[1]),
                 })
-            except Exception as e:
-                st.write("偵錯｜單列解析失敗 =", row, str(e))
+            except Exception:
                 continue
 
-        st.write("偵錯｜get_twse_month 成功筆數 =", len(rows))
         return pd.DataFrame(rows)
 
-    except Exception as e:
-        st.write("偵錯｜get_twse_month 整體失敗 =", str(e))
+    except Exception:
         return pd.DataFrame()
 
 def get_tpex_month(code: str, roc_year_month: str) -> pd.DataFrame:
@@ -1073,6 +1046,7 @@ if search_btn and code_input:
 
 else:
     st.write("✅ 這是 Raymond 的台股深度分析，請輸入股票代碼後點擊左側「開始分析」。")
+
 
 
 
