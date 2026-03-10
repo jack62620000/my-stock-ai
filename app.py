@@ -362,10 +362,13 @@ def fetch_mops_tables(form_id: str, market: str, roc_year: int, season: int):
             verify=False,
         )
         r.raise_for_status()
+
         text = r.text.strip()
         if not text:
             return []
-         return pd.read_html(text)
+
+        return pd.read_html(text)
+
     except Exception:
         return []
 
@@ -999,4 +1002,5 @@ if search_btn and code_input:
 
 else:
     st.write("✅ 這是 Raymond 的台股深度分析，請輸入股票代碼後點擊左側「開始分析」。")
+
 
