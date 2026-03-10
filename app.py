@@ -242,27 +242,49 @@ def get_twse_month(code: str, yyyymm01: str) -> pd.DataFrame:
         )
         r.raise_for_status()
 
-        text = r.text.strip()
-
-        if not text:
-            return pd.DataFrame()
-
         js = r.json()
 
         if js.get("stat") != "OK":
             return pd.DataFrame()
 
         rows = []
+
         for row in js.get("data", []):
             try:
+                # 新版 TWSE 日期格式直接用 pandas 解析最穩
+                raw_date = str(row[0]).strip().replace("年", "/").replace("月", "/").replace("日", "")
+                
+                # 先嘗試民國年格式 115/03/05
+                if "/" in raw_date:
+                    parts = raw_date.split("/")
+                    if len(parts) == 3:
+                        y, m, d = parts
+                        y = y.strip()
+                        m = m.strip()
+                        d = d.strip()
+
+                        # 民國年轉西元
+                        if len(y) <= 3:
+                            y = str(int(y) + 1911)
+
+                        dt = pd.Timestamp(f"{int(y):04d}-{int(m):02d}-{int(d):02d}")
+                    else:
+                        dt = pd.to_datetime(raw_date, errors="coerce")
+                else:
+                    dt = pd.to_datetime(raw_date, errors="coerce")
+
+                if pd.isna(dt):
+                    continue
+
                 rows.append({
-                    "Date": roc_to_ad_date(row[0]),
+                    "Date": dt,
                     "Open": safe_float(row[3]),
                     "High": safe_float(row[4]),
                     "Low": safe_float(row[5]),
                     "Close": safe_float(row[6]),
                     "Volume": safe_float(row[1]),
                 })
+
             except Exception:
                 continue
 
@@ -270,25 +292,6 @@ def get_twse_month(code: str, yyyymm01: str) -> pd.DataFrame:
 
     except Exception:
         return pd.DataFrame()
-
-    rows = []
-    for row in js.get("data", []):
-        try:
-            rows.append({
-                "Date": roc_to_ad_date(row[0]),
-                "Open": safe_float(row[3]),
-                "High": safe_float(row[4]),
-                "Low": safe_float(row[5]),
-                "Close": safe_float(row[6]),
-                "Volume": safe_float(row[1]),
-            })
-        except Exception as e:
-            st.write("偵錯｜單列解析失敗 =", row, str(e))
-            continue
-
-    df = pd.DataFrame(rows)
-    st.write("偵錯｜get_twse_month 最終筆數 =", len(df))
-    return df
 
 def get_tpex_month(code: str, roc_year_month: str) -> pd.DataFrame:
     # 例: 114/03
@@ -1060,6 +1063,7 @@ if search_btn and code_input:
 
 else:
     st.write("✅ 這是 Raymond 的台股深度分析，請輸入股票代碼後點擊左側「開始分析」。")
+
 
 
 
