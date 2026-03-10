@@ -319,8 +319,20 @@ def fetch_mops_tables(form_id: str, market: str, roc_year: int, season: int):
             verify=False
         )
         r.raise_for_status()
-        return pd.read_html(r.text)
-    except Exception:
+
+        text = r.text.strip()
+
+        st.caption(f"MOPS form={form_id}, year={roc_year}, season={season}, 長度={len(text)}")
+        st.caption(f"MOPS 前80字={text[:80]}")
+
+        if not text:
+            return []
+
+        tables = pd.read_html(text)
+        return tables
+
+    except Exception as e:
+        st.caption(f"fetch_mops_tables 錯誤 form={form_id}, y={roc_year}, q={season}: {str(e)}")
         return []
 
 
@@ -504,6 +516,10 @@ def build_metrics(code: str):
 
     # 財報
     fin = get_financial_snapshots(code, market)
+    
+    st.write("偵錯｜income 筆數：", len(fin["income"]))
+    st.write("偵錯｜balance 筆數：", len(fin["balance"]))
+    st.write("偵錯｜cash 筆數：", len(fin["cash"]))
 
     i0 = fin["income"][0]["data"] if len(fin["income"]) > 0 else {}
     i1 = fin["income"][1]["data"] if len(fin["income"]) > 1 else {}
@@ -514,6 +530,10 @@ def build_metrics(code: str):
     c0 = fin["cash"][0]["data"] if len(fin["cash"]) > 0 else {}
     c1 = fin["cash"][1]["data"] if len(fin["cash"]) > 1 else {}
 
+    st.write("偵錯｜最新損益表欄位：", i0)
+    st.write("偵錯｜最新資產負債表欄位：", b0)
+    st.write("偵錯｜最新現金流欄位：", c0)
+    
     revenue = i0.get("revenue", np.nan)
     gross_profit_amt = i0.get("gross_profit_amt", np.nan)
     operating_income = i0.get("operating_income", np.nan)
@@ -953,6 +973,7 @@ if search_btn and code_input:
 
 else:
     st.write("✅ 這是 Raymond 的台股深度分析，請輸入股票代碼後點擊左側「開始分析」。")
+
 
 
 
