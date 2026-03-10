@@ -232,51 +232,53 @@ def get_twse_month(code: str, yyyymm01: str) -> pd.DataFrame:
         "stockNo": code,
     }
 
-    try:
-        r = requests.get(
-            url,
-            params=params,
-            headers=HEADERS,
-            timeout=20,
-            verify=False
-        )
-        r.raise_for_status()
+    r = requests.get(
+        url,
+        params=params,
+        headers=HEADERS,
+        timeout=20,
+        verify=False
+    )
+    r.raise_for_status()
 
-        text = r.text.strip()
+    text = r.text.strip()
 
-        # 空內容
-        if not text:
-            return pd.DataFrame()
+    st.write("偵錯｜TWSE status =", r.status_code)
+    st.write("偵錯｜TWSE content-type =", r.headers.get("Content-Type", ""))
+    st.write("偵錯｜TWSE 前60字 =", text[:60])
 
-        # 不是 JSON 格式開頭
-        if not (text.startswith("{") or text.startswith("[")):
-            return pd.DataFrame()
-
-        # 只有在看起來像 JSON 時才解析
-        js = requests.models.complexjson.loads(text)
-
-        if js.get("stat") != "OK":
-            return pd.DataFrame()
-
-        rows = []
-        for row in js.get("data", []):
-            try:
-                rows.append({
-                    "Date": roc_to_ad_date(row[0]),
-                    "Open": safe_float(row[3]),
-                    "High": safe_float(row[4]),
-                    "Low": safe_float(row[5]),
-                    "Close": safe_float(row[6]),
-                    "Volume": safe_float(row[1]),
-                })
-            except Exception:
-                continue
-
-        return pd.DataFrame(rows)
-
-    except Exception as e:
+    if not text:
+        st.error("get_twse_month：TWSE 回傳空字串")
         return pd.DataFrame()
 
+    try:
+        js = r.json()
+    except Exception as e:
+        st.error(f"get_twse_month：JSON 解析失敗：{e}")
+        return pd.DataFrame()
+
+    if js.get("stat") != "OK":
+        st.error(f"get_twse_month：TWSE stat != OK，實際為 {js.get('stat')}")
+        return pd.DataFrame()
+
+    rows = []
+    for row in js.get("data", []):
+        try:
+            rows.append({
+                "Date": roc_to_ad_date(row[0]),
+                "Open": safe_float(row[3]),
+                "High": safe_float(row[4]),
+                "Low": safe_float(row[5]),
+                "Close": safe_float(row[6]),
+                "Volume": safe_float(row[1]),
+            })
+        except Exception as e:
+            st.write("偵錯｜單列解析失敗 =", row, str(e))
+            continue
+
+    df = pd.DataFrame(rows)
+    st.write("偵錯｜get_twse_month 最終筆數 =", len(df))
+    return df
 
 def get_tpex_month(code: str, roc_year_month: str) -> pd.DataFrame:
     # 例: 114/03
@@ -316,40 +318,35 @@ def get_tpex_month(code: str, roc_year_month: str) -> pd.DataFrame:
 
 
 @st.cache_data(ttl=3600)
+@st.cache_data(ttl=3600)
 def get_price_history(code: str, market: str, months: int = 12) -> pd.DataFrame:
     now = pd.Timestamp.today().normalize().replace(day=1)
     dfs = []
-    debug_logs = []
 
     for i in range(months):
         dt = now - pd.DateOffset(months=i)
 
-        try:
-            if market == "sii":
-                yyyymm01 = dt.strftime("%Y%m01")
-                debug_logs.append(f"TWSE 查詢月份: {yyyymm01}")
-                df = get_twse_month(code, yyyymm01)
-            else:
-                roc_ym = f"{ad_to_roc(dt.year)}/{dt.month:02d}"
-                debug_logs.append(f"TPEX 查詢月份: {roc_ym}")
-                df = get_tpex_month(code, roc_ym)
+        if market == "sii":
+            yyyymm01 = dt.strftime("%Y%m01")
+            st.write("偵錯｜TWSE 查詢月份 =", yyyymm01)
+            df = get_twse_month(code, yyyymm01)
+        else:
+            roc_ym = f"{ad_to_roc(dt.year)}/{dt.month:02d}"
+            st.write("偵錯｜TPEX 查詢月份 =", roc_ym)
+            df = get_tpex_month(code, roc_ym)
 
-            debug_logs.append(f"這個月抓到 {len(df)} 筆")
+        st.write("偵錯｜這個月筆數 =", len(df))
 
-            if not df.empty:
-                dfs.append(df)
-
-        except Exception as e:
-            debug_logs.append(f"錯誤: {str(e)}")
-            continue
+        if not df.empty:
+            dfs.append(df)
 
     if not dfs:
+        st.error("get_price_history：12個月都沒有抓到任何股價資料")
         return pd.DataFrame()
 
     out = pd.concat(dfs, ignore_index=True)
     out = out.drop_duplicates(subset=["Date"]).sort_values("Date").reset_index(drop=True)
     return out
-
 
 # =========================
 # 財報：MOPS
@@ -1053,6 +1050,7 @@ if search_btn and code_input:
 
 else:
     st.write("✅ 這是 Raymond 的台股深度分析，請輸入股票代碼後點擊左側「開始分析」。")
+
 
 
 
