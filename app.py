@@ -4,10 +4,12 @@ import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-# --- 1. 數據準備 ---
-def get_hard_locked_data():
+# --- 1. 模擬數據 ---
+def get_final_hard_locked_data():
+    # 生成 100 天數據
+    dates = pd.bdate_range(start='2024-01-01', periods=100).strftime('%Y-%m-%d').tolist()
     df = pd.DataFrame({
-        'Date': pd.bdate_range(start='2024-01-01', periods=100).strftime('%Y-%m-%d'),
+        'Date': dates,
         'Close': (500 + np.random.randn(100).cumsum() * 5).round(1)
     })
     df['Open'] = (df['Close'] + np.random.uniform(-5, 5, 100)).round(1)
@@ -17,40 +19,35 @@ def get_hard_locked_data():
     df['Color'] = np.where(df['Close'] >= df['Open'], '#EB3B3B', '#26A69A')
     return df
 
-df = get_hard_locked_data()
+df = get_final_hard_locked_data()
 total_len = len(df)
 
-# --- 2. 圖表建立 ---
+# --- 2. 建立圖表 ---
 fig = make_subplots(rows=2, cols=1, shared_xaxes=True, 
                     vertical_spacing=0.03, row_heights=[0.7, 0.3])
 
-# K線 (X軸使用 Index)
+# K線 (X軸直接給字串日期，強制觸發 Category 模式)
 fig.add_trace(go.Candlestick(
-    x=df.index, open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'],
+    x=df['Date'], open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'],
     increasing_line_color='#EB3B3B', increasing_fillcolor='#EB3B3B',
     decreasing_line_color='#26A69A', decreasing_fillcolor='#26A69A',
     name='價格'
 ), row=1, col=1)
 
 # 成交量
-fig.add_trace(go.Bar(x=df.index, y=df['Volume'], marker_color=df['Color'], name='成交量'), row=2, col=1)
+fig.add_trace(go.Bar(x=df['Date'], y=df['Volume'], marker_color=df['Color'], name='成交量'), row=2, col=1)
 
-# --- 3. 【終極鎖定邏輯】 ---
-# 計算初始視窗：最後 30 根
-view_start = total_len - 30.5
-view_end = total_len - 0.5
-
+# --- 3. 【硬鎖定邏輯】 ---
+# 在 Category 模式下，我們設定 X 軸的顯示範圍
 fig.update_xaxes(
-    range=[view_start, view_end],
-    # 關鍵屬性 1：固定範圍模式，不允許自動延伸
-    autorange=False,
-    # 關鍵屬性 2：強制座標軸只在數據範圍內移動
-    # 注意：Plotly 的 pan 模式下，這能大幅減少往外拉的空間
-    constrain='domain',
-    showgrid=True, gridcolor='#F0F0F0',
-    # 將索引轉回日期標籤
-    tickvals=df.index[::10],
-    ticktext=df['Date'][::10],
+    type='category',  # 這是關鍵：改為類別型
+    range=[total_len - 30.5, total_len - 0.5], # 鎖定顯示最後 30 筆
+    tickangle=0,
+    nticks=10,
+    showgrid=True,
+    gridcolor='#F5F5F5',
+    # 禁用縮放與拖曳到邊界外的行為 (在某些 Plotly 版本中有效)
+    fixedrange=False, 
 )
 
 fig.update_layout(
@@ -61,17 +58,17 @@ fig.update_layout(
     hovermode='x unified',
     margin=dict(l=10, r=60, t=10, b=10),
     showlegend=False,
-    # 鎖定 Y 軸，避免 Y 軸在拖動時產生不必要的空白
     yaxis=dict(side='right', fixedrange=False, autorange=True),
     yaxis2=dict(side='right', fixedrange=True)
 )
 
-# --- 4. 顯示設定 ---
-# config 中的 scrollZoom 設為 True，但 displayModeBar 關閉
+# --- 4. 終極配置：移除座標軸拖動把手 ---
+# 這樣使用者就不能透過拉座標軸來製造空白
 st.plotly_chart(fig, use_container_width=True, config={
     'scrollZoom': True,
     'displayModeBar': False,
-    'showAxisDragHandles': False, # 禁用座標軸拖動，防止拉出空白
+    'showAxisDragHandles': False, # 禁止拉扯座標軸
+    'doubleClick': 'reset'        # 雙擊回歸初始鎖定視圖
 })
 
-st.info("🎯 已強化邊界鎖定：嘗試向右或向左拖拽，視窗將會被限制在數據範圍內。")
+st.warning("🛡️ 邊界警報：目前已使用 Category Axis 強制鎖定。若拖曳超出數據，Plotly 會因無索引可對應而停止產生空白刻度。")
