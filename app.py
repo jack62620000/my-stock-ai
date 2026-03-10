@@ -85,9 +85,9 @@ def get_deep_analysis_data(code):
 
             # 優先抓較輕量資料
             try:
-                fast_info = safe_yf_call(lambda: ticker.fast_info) or {}
+                _ = safe_yf_call(lambda: ticker.fast_info)
             except Exception:
-                fast_info = {}
+                pass
 
             # info 很容易被限流，所以抓不到就給空 dict，不中斷
             try:
@@ -340,8 +340,6 @@ def get_deep_analysis_data(code):
                 "price": price,
                 "name": stock_meta.get("name", code),
                 "suffix": suffix,
-                "info": info,
-                "fast_info": fast_info,
                 "price_change": price_change,
                 "price_change_pct": price_change_pct,
 
@@ -1008,4 +1006,5 @@ if search_btn and code_input:
         st.write("✅這是Raymond的台股深度分析，請輸入正確的股票代碼")
 else:
     st.write("✅這是Raymond的台股深度分析，請輸入股票代碼後點擊左側『開始分析』")
+
 
