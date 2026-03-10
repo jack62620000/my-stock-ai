@@ -85,13 +85,13 @@ def get_deep_analysis_data(code):
 
             # 優先抓較輕量資料
             try:
-                fast_info = safe_yf_call(lambda: ticker.fast_info)
+                fast_info = safe_yf_call(lambda: ticker.fast_info) or {}
             except Exception:
                 fast_info = {}
 
             # info 很容易被限流，所以抓不到就給空 dict，不中斷
             try:
-                info = safe_yf_call(lambda: ticker.info)
+                info = safe_yf_call(lambda: ticker.info) or {}
             except Exception:
                 info = {}
 
@@ -120,6 +120,8 @@ def get_deep_analysis_data(code):
             # 財務報表（收入、資產、負債、現金流）
             try:
                 financials = safe_yf_call(lambda: ticker.financials)
+                if financials is None or not isinstance(financials, pd.DataFrame):
+                    financials = pd.DataFrame()
                 income = financials.loc["Net Income"] if "Net Income" in financials.index else pd.Series([np.nan])
                 revenue = financials.loc["Total Revenue"] if "Total Revenue" in financials.index else pd.Series([np.nan])
 
@@ -152,6 +154,8 @@ def get_deep_analysis_data(code):
 
             try:
                 balance_sheet = safe_yf_call(lambda: ticker.balance_sheet)
+                if balance_sheet is None or not isinstance(balance_sheet, pd.DataFrame):
+                    balance_sheet = pd.DataFrame()
                 total_assets = balance_sheet.loc["Total Assets"].iloc[0] if "Total Assets" in balance_sheet.index else np.nan
                 total_liabilities = (
                     balance_sheet.loc["Total Liabilities Net Minority Interest"].iloc[0]
@@ -220,6 +224,8 @@ def get_deep_analysis_data(code):
 
             try:
                 cashflow = safe_yf_call(lambda: ticker.cashflow)
+                if cashflow is None or not isinstance(cashflow, pd.DataFrame):
+                    cashflow = pd.DataFrame()
                 operating_cashflow = (
                     cashflow.loc["Operating Cash Flow"].iloc[0]
                     if "Operating Cash Flow" in cashflow.index
@@ -1002,3 +1008,4 @@ if search_btn and code_input:
         st.write("✅這是Raymond的台股深度分析，請輸入正確的股票代碼")
 else:
     st.write("✅這是Raymond的台股深度分析，請輸入股票代碼後點擊左側『開始分析』")
+
