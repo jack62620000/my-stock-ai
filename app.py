@@ -104,44 +104,45 @@ if submit:
             except:
                 pass
 
-        # AI 分析 prompt
-        prompt = f"""
-你是一位台股首席分析師，請針對以下股票進行專業投資分析：
+        # 分段生成分析報告
+        sections = [
+            "1. 全球與產業趨勢影響",
+            "2. 公司基本面與護城河",
+            "3. 技術面與動能判斷",
+            "4. 法人可能目標價區間（保守 / 中性 / 樂觀）",
+            "5. 操作策略建議（短線 / 中長線）"
+        ]
+
+        full_report = ""
+        for sec in sections:
+            sec_prompt = f"""
+請針對以下股票撰寫專業分析，只分析 {sec}，用條列方式、專業語氣：
 
 股票代號：{stock_code}
 目前股價：{current_price}
 RSI 指標：{rsi_val}
 近五日外資買賣超：{foreign_net}
-
-請分段說明：
-1. 全球與產業趨勢影響
-2. 公司基本面與護城河
-3. 技術面與動能判斷
-4. 法人可能目標價區間（保守 / 中性 / 樂觀）
-5. 操作策略建議（短線 / 中長線）
-
-請用條列清楚、語氣專業、不誇大。
 """
 
-        # 呼叫 Gemini AI
-        try:
-            response = client.models.generate_content(
-                model=MODEL_NAME,
-                contents=prompt,
-                config={"temperature": 0.7, "max_output_tokens": 1200}
-            )
+            try:
+                response = client.models.generate_content(
+                    model=MODEL_NAME,
+                    contents=sec_prompt,
+                    config={"temperature": 0.7, "max_output_tokens": 4000}  # 每段 800 token
+                )
 
-            # 確保抓到完整文字
-            if hasattr(response, "text"):
-                ai_text = response.text
-            elif hasattr(response, "candidates") and len(response.candidates) > 0:
-                ai_text = response.candidates[0].content
-            else:
-                ai_text = str(response)
+                if hasattr(response, "text"):
+                    text = response.text
+                elif hasattr(response, "candidates") and len(response.candidates) > 0:
+                    text = response.candidates[0].content
+                else:
+                    text = str(response)
 
-            st.markdown(f"## 📊 {stock_code} AI 投資分析報告")
-            st.markdown(ai_text)
+                full_report += f"### {sec}\n{text}\n\n"
 
-        except Exception as e:
-            st.error("❌ Gemini 呼叫失敗")
-            st.exception(e)
+            except Exception as e:
+                full_report += f"### {sec}\n❌ 生成失敗：{e}\n\n"
+
+        # 顯示完整報告
+        st.markdown(f"## 📊 {stock_code} AI 投資分析報告")
+        st.markdown(full_report)
