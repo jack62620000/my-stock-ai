@@ -23,8 +23,6 @@ if "GEMINI_API_KEY" not in st.secrets:
     st.error("❌ 請在 Streamlit Secrets 設定 GEMINI_API_KEY")
     st.stop()
 
-genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-
 # ===============================
 # 2. 資料抓取（含備援）
 # ===============================
@@ -137,6 +135,7 @@ RSI 指標：{rsi_val}
         except Exception as e:
             st.error("❌ Gemini v1 API 呼叫失敗")
             st.exception(e)
+
 
 
 
