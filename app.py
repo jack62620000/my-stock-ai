@@ -2,142 +2,123 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import pandas_ta as ta
-from FinMind.data import DataLoader
 from google import genai
-from datetime import datetime, timedelta
+from datetime import datetime
 
 # ===============================
-# 1. 基礎設定
-# ===============================
-st.set_page_config(
-    page_title="AI 股市首席分析報告",
-    layout="centered"
-)
-st.title("🤖 AI 股市首席分析報告")
-
-# ===============================
-# 2. Gemini API 初始化
-# ===============================
-if "GEMINI_API_KEY" not in st.secrets:
-    st.error("❌ 請在 Streamlit Secrets 設定 GEMINI_API_KEY")
-    st.stop()
-
-client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
-
-# 自動取得可用 Gemini 模型
-try:
-    available_models = client.models.list()
-    gemini_models = [m.name for m in available_models if "gemini" in m.name]
-
-    if not gemini_models:
-        st.error("❌ 此 API Key 沒有任何可用的 Gemini 模型")
-        st.stop()
-
-    MODEL_NAME = gemini_models[0]  # 選第一個可用模型
-    st.info(f"✅ 使用模型：{MODEL_NAME}")
-
-except Exception as e:
-    st.error("❌ 無法取得可用模型")
-    st.exception(e)
-    st.stop()
-
-# ===============================
-# 3. 抓取股票數據函式
+# 1. 核心量化計算模組
 # ===============================
 @st.cache_data(ttl=3600)
-def get_stock_data(stock_id: str):
-    pure_id = stock_id.replace(".TW", "").replace(".TWO", "")
-    yf_id = f"{pure_id}.TW"
-
-    df_price = pd.DataFrame()
-    df_inst = pd.DataFrame()
-    company_name = "未知公司"
-
-    # Yahoo Finance：價格 + RSI + 公司名稱
+def get_quantitative_data(stock_id: str):
     try:
+        yf_id = f"{stock_id.replace('.TW', '')}.TW"
         ticker = yf.Ticker(yf_id)
-        df_price = ticker.history(period="6mo")
-        company_name = ticker.info.get("shortName", company_name)
-        if not df_price.empty:
-            df_price["RSI"] = ta.rsi(df_price["Close"], length=14)
-    except:
-        pass
-
-    # FinMind：法人籌碼
-    try:
-        dl = DataLoader()
-        start_date = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
-        df_inst = dl.taiwan_stock_institutional_investors(
-            stock_id=pure_id,
-            start_date=start_date
-        )
-    except:
-        pass
-
-    return df_price, df_inst, company_name
+        
+        # 1. 歷史價格數據 (用於計算技術指標)
+        df = ticker.history(period="1y") # 抓一年份數據計算指標較準確
+        if df.empty: return None
+        
+        # 技術指標計算
+        df['MA5'] = ta.sma(df['Close'], length=5)
+        df['MA20'] = ta.sma(df['Close'], length=20)
+        df['MA60'] = ta.sma(df['Close'], length=60)
+        df['RSI'] = ta.rsi(df['Close'], length=14)
+        
+        # 2. 基本面價值數據
+        info = ticker.info
+        metrics = {
+            "公司名稱": info.get("shortName", "N/A"),
+            "目前股價": df['Close'].iloc[-1],
+            "昨收價": df['Close'].iloc[-2],
+            "本益比 (PE)": info.get("trailingPE", 0),
+            "股價淨值比 (PB)": info.get("priceToBook", 0),
+            "現金股利殖利率": (info.get("dividendYield", 0) or 0) * 100,
+            "EPS (過去四季)": info.get("trailingEps", 0),
+            "52週最高": info.get("fiftyTwoWeekHigh", 0),
+            "52週最低": info.get("fiftyTwoWeekLow", 0),
+        }
+        
+        # 3. 整理技術指標最近值
+        tech_status = {
+            "RSI14": df['RSI'].iloc[-1],
+            "5MA": df['MA5'].iloc[-1],
+            "20MA": df['MA20'].iloc[-1],
+            "60MA": df['MA60'].iloc[-1],
+        }
+        
+        return metrics, tech_status, df.tail(10) # 回傳最近10筆原始數據
+    except Exception as e:
+        st.error(f"數據解析錯誤: {e}")
+        return None
 
 # ===============================
-# 4. 側邊欄
+# 2. 價值投資判定邏輯
 # ===============================
+def analyze_value(m):
+    # 巴菲特式安全邊際邏輯 (範例：PB < 1.5 且 殖利率 > 4% 為優)
+    score = 0
+    reasons = []
+    
+    if m["股價淨值比 (PB)"] < 1.5: 
+        score += 1
+        reasons.append("PB 低於 1.5 (估值偏低)")
+    if m["現金股利殖利率"] > 4: 
+        score += 1
+        reasons.append("殖利率高於 4% (防守力強)")
+    if m["目前股價"] < m["52週最高"] * 0.8: 
+        score += 1
+        reasons.append("股價已從高點回落超過 20% (具安全邊際)")
+        
+    status = "積極買進" if score >= 3 else "分批佈局" if score >= 1 else "觀望待變"
+    return status, reasons
+
+# ===============================
+# 3. Streamlit UI 介面
+# ===============================
+st.set_page_config(page_title="量化數據決策終端", layout="wide")
+st.title("📊 台股量化價值決策終端")
+
 with st.sidebar:
-    stock_code = st.text_input("輸入台股代號（例如 2330）", value="2356")
-    submit = st.button("🚀 生成 AI 分析報告", type="primary")
+    stock_code = st.text_input("輸入台股代號", value="2330")
+    api_key = st.text_input("Gemini API Key", type="password")
+    submit = st.button("執行量化分析", type="primary")
 
-# ===============================
-# 5. 主流程
-# ===============================
 if submit:
-    with st.spinner("📡 收集資料並進行 AI 分析中..."):
-        df_price, df_inst, company_name = get_stock_data(stock_code)
+    res = get_quantitative_data(stock_code)
+    if res:
+        metrics, tech, raw_data = res
+        
+        # A. 核心指標區
+        st.subheader(f"🔍 {metrics['公司名稱']} ({stock_code}) 核心數據")
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("目前價格", f"{metrics['目前股價']:.2f}", f"{metrics['目前股價']-metrics['昨收價']:.2f}")
+        col2.metric("本益比 (PE)", f"{metrics['本益比 (PE)']:.2f}")
+        col3.metric("股價淨值比 (PB)", f"{metrics['股價淨值比 (PB)']:.2f}")
+        col4.metric("殖利率 (%)", f"{metrics['現金股利殖利率']:.2f}%")
 
-        # 股價與 RSI
-        current_price = round(df_price["Close"].iloc[-1], 2) if not df_price.empty else "無資料"
-        rsi_val = round(df_price["RSI"].iloc[-1], 2) if not df_price.empty else "N/A"
+        # B. 決策判斷區
+        st.divider()
+        decision, reasons = analyze_value(metrics)
+        c1, c2 = st.columns([1, 2])
+        with c1:
+            st.info(f"🛡️ **安全邊際評估：{decision}**")
+        with c2:
+            st.write(f"判定依據：{', '.join(reasons) if reasons else '目前無明顯價值特徵'}")
 
-        # 外資五日買賣超
-        foreign_net = "無資料"
-        if not df_inst.empty:
-            try:
-                foreign_net = int(
-                    df_inst["Foreign_Investor_Buy"].tail(5).sum() -
-                    df_inst["Foreign_Investor_Sell"].tail(5).sum()
-                )
-            except:
-                pass
+        # C. 數據表格區 (取代 K 線圖)
+        st.subheader("📋 量化指標清單")
+        tech_df = pd.DataFrame([tech]).T.rename(columns={0: "數值"})
+        st.table(tech_df) # 使用 Table 呈現更穩定的格式
 
-        st.write(f"股票名稱確認：**{company_name}**")
-        st.write(f"目前股價：{current_price}，RSI：{rsi_val}，近五日外資買賣超：{foreign_net}")
+        st.subheader("📅 近 10 日歷史數據回測")
+        st.dataframe(raw_data[['Close', 'Volume', 'MA5', 'MA20', 'RSI']].style.format("{:.2f}"))
 
-        # 分段生成分析報告
-        sections = [
-            "🌍 【全球局勢與宏觀風險分析】",
-            "💎 【內在價值審查分析】",
-            "📉 【股價走勢與動能判斷】",
-            "🎯 【法人目標價與時間預估】",
-            "📈 【終極投資策略建議】"
-        ]
-
-        for sec in sections:
-            # 取得短標題：只抓 【】裡面的文字
-            short_title = sec.split("】")[1] if "】" in sec else sec
-
-            sec_prompt = f"""
-請針對股票 {stock_code}（{company_name}）撰寫專業分析，只分析這一部分，用條列方式、專業語氣：
-分析主題：{sec}
-目前股價：{current_price}
-RSI 指標：{rsi_val}
-近五日外資買賣超：{foreign_net}
-"""
-
-            st.markdown(f"### {short_title}")  # 顯示短標題
-
-            try:
-                response = client.models.generate_content(
-                    model=MODEL_NAME,
-                    contents=sec_prompt,
-                    config={"temperature": 0.7, "max_output_tokens": 1800}  # 每段分開生成
-                )
-                text = response.text if hasattr(response, "text") else response.candidates[0].content
-                st.markdown(text)
-            except Exception as e:
-                st.markdown(f"❌ 生成失敗：{e}")
+        # D. AI 總結
+        if api_key:
+            client = genai.Client(api_key=api_key)
+            prompt = f"請根據以下數據進行簡短專業的投資評論：{metrics} 以及技術指標 {tech}。請直接給出支撐位與壓力位建議。"
+            ai_res = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
+            st.success("🤖 AI 專業投顧建議")
+            st.write(ai_res.text)
+    else:
+        st.error("無法取得數據，請確認代號是否正確。")
