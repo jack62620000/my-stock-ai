@@ -8,154 +8,140 @@ from datetime import datetime
 # ===============================
 # 1. 核心設定與 API 初始化
 # ===============================
-st.set_page_config(page_title="量化數據決策終端", layout="wide")
+st.set_page_config(page_title="2026 AI 量化投資決策端", layout="wide")
 
-# 檢查 Secrets
 if "GEMINI_API_KEY" not in st.secrets:
     st.error("❌ 請在 Streamlit Secrets 設定 GEMINI_API_KEY")
     st.stop()
 
 client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 
-# 自動取得可用模型清單
 @st.cache_resource
 def get_available_models():
     try:
         models = client.models.list()
-        # 遍歷模型，篩選出支援生成內容且包含 gemini 字樣的模型
         gemini_models = [m.name for m in models if "gemini" in m.name.lower()]
-        # 優先排序 flash 系列
         gemini_models.sort(key=lambda x: ("flash" not in x.lower()))
         return gemini_models
     except:
-        # 若自動偵測失敗，提供穩定備案
         return ["gemini-2.0-flash", "gemini-1.5-flash"]
 
 AVAILABLE_MODELS = get_available_models()
 
 # ===============================
-# 2. 數據處理模組 (精簡化)
+# 2. 進階數據抓取模組 (包含 KD/MACD/基本面)
 # ===============================
 @st.cache_data(ttl=3600)
-def get_clean_quant_data(stock_id: str):
-    # 自動處理台股後綴
-    if not (stock_id.endswith(".TW") or stock_id.endswith(".TWO")):
-        ticker_id = f"{stock_id}.TW"
-    else:
-        ticker_id = stock_id
-
+def get_advanced_quant_data(stock_id: str):
+    ticker_id = f"{stock_id.replace('.TW', '').replace('.TWO', '')}.TW"
     try:
         ticker = yf.Ticker(ticker_id)
         df = ticker.history(period="1y")
         if df.empty: return None, None
         
-        # 技術指標計算
+        # 技術指標計算 (KD, MACD, RSI)
+        df.ta.stoch(high='High', low='Low', k=9, d=3, append=True) # STOCHk_9_3_3, STOCHd_9_3_3
+        df.ta.macd(fast=12, slow=26, signal=9, append=True)        # MACD_12_26_9
         df['RSI'] = ta.rsi(df['Close'], length=14)
         df['MA20'] = ta.sma(df['Close'], length=20)
         
         info = ticker.info
         
-        # 殖利率邏輯修正 (處理百分比單位)
+        # 抓取基本面
         dy = info.get("dividendYield", 0) or 0
-        dy_pct = dy if dy > 1 else dy * 100
-        
-        # 1. 核心指標 (精簡至小數點後 2 位)
         metrics = {
             "名稱": info.get("shortName", "未知"),
             "現價": round(df['Close'].iloc[-1], 2),
-            "本益比 PE": round(info.get("trailingPE", 0) or 0, 2),
-            "淨值比 PB": round(info.get("priceToBook", 0) or 0, 2),
-            "殖利率 (%)": round(dy_pct, 2),
-            "RSI14": round(df['RSI'].iloc[-1], 2) if not df['RSI'].empty else 0,
-            "乖離率 (%)": round(((df['Close'].iloc[-1] / df['MA20'].iloc[-1]) - 1) * 100, 2) if not df['MA20'].empty else 0
+            "PE": round(info.get("trailingPE", 0) or 0, 2),
+            "PB": round(info.get("priceToBook", 0) or 0, 2),
+            "ROE": round((info.get("returnOnEquity", 0) or 0) * 100, 2),
+            "毛利率": round((info.get("grossMargins", 0) or 0) * 100, 2),
+            "殖利率": round(dy if dy > 1 else dy * 100, 2),
+            "K值": round(df['STOCHk_9_3_3'].iloc[-1], 2),
+            "D值": round(df['STOCHd_9_3_3'].iloc[-1], 2),
+            "MACD": round(df['MACD_12_26_9'].iloc[-1], 2),
+            "RSI14": round(df['RSI'].iloc[-1], 2),
+            "乖離率%": round(((df['Close'].iloc[-1] / df['MA20'].iloc[-1]) - 1) * 100, 2)
         }
         
-        # 2. 歷史交易明細 (清洗日期與小數點)
         recent_history = df.tail(10).copy()
         recent_history.index = recent_history.index.strftime('%Y-%m-%d')
         recent_history = recent_history[['Open', 'High', 'Low', 'Close', 'Volume']].round(2)
         
         return metrics, recent_history
-    except:
+    except Exception as e:
+        st.error(f"數據解析出錯: {e}")
         return None, None
 
 # ===============================
-# 3. UI 佈局設計
+# 3. UI 介面
 # ===============================
-st.title("🛡️ 量化價值決策核心")
+st.title("🤖 2026 AI 股市首席分析報告")
 
 with st.sidebar:
-    st.header("數據檢索參數")
-    stock_input = st.text_input("輸入台股代號 (例: 2330)", value="2330")
-    
+    stock_input = st.text_input("輸入台股代號", value="2330")
     if AVAILABLE_MODELS:
-        default_model = st.selectbox("首選 AI 模型", AVAILABLE_MODELS)
-    
-    run_btn = st.button("啟動量化分析", type="primary")
-    st.divider()
-    st.caption("開發者備註：本系統僅供參考，投資請謹慎評估。")
+        default_model = st.selectbox("首選分析模型", AVAILABLE_MODELS)
+    run_btn = st.button("生成五大核心報告", type="primary")
 
 if run_btn:
-    data, history = get_clean_quant_data(stock_input)
+    data, history = get_advanced_quant_data(stock_input)
     
     if data:
-        # A. 核心指標看板
+        # A. 數據看板
         c1, c2, c3, c4 = st.columns(4)
-        c1.metric("目前股價", f"{data['現價']}")
-        c2.metric("本益比 PE", f"{data['本益比 PE']}")
-        c3.metric("淨值比 PB", f"{data['淨值比 PB']}")
-        c4.metric("殖利率 (%)", f"{data['殖利率 (%)']}%")
+        c1.metric("目前價格", data["現價"])
+        c2.metric("ROE / 毛利", f"{data['ROE']}% / {data['毛利率']}%")
+        c3.metric("KD / RSI", f"{data['K值']} / {data['RSI14']}")
+        c4.metric("PE / PB", f"{data['PE']} / {data['PB']}")
 
         st.divider()
 
-        # B. AI 首席決策總結 (優先呈現)
-        st.subheader("🤖 AI 首席決策總結")
+        # B. 核心深度分析報告
+        st.subheader("📝 首席投資決策報告 (2026 版)")
         
+        # 強化後的深度 Prompt
         prompt = f"""
-        你是精通價值投資的量化專家。分析台股 {data['名稱']}({stock_input}):
-        現價: {data['現價']}, PE: {data['本益比 PE']}, PB: {data['淨值比 PB']}, 
-        殖利率: {data['殖利率 (%)']}%, RSI14: {data['RSI14']}。
-        請給出明確結論：1. 投資評等(買進/觀望/賣出) 2. 核心分析理由 3. 操作建議區間。
+        你是一位精通 Python 數據分析與價值投資的量化投資工程師。請針對台股 {data['名稱']}({stock_input}) 撰寫 2026 年深度分析報告。
+        數據參考：
+        - 財務：ROE {data['ROE']}%, 毛利 {data['毛利率']}%, PE {data['PE']}, PB {data['PB']}, 殖利率 {data['殖利率']}%
+        - 技術：K/D {data['K值']}/{data['D值']}, MACD {data['MACD']}, RSI {data['RSI14']}, 乖離率 {data['乖離率%']}%
+        
+        請嚴格依照下列五大模組撰寫，口氣需專業、理性、具備前瞻性：
+
+        🌍 【全球局勢與宏觀風險分析】：分析2026年當前環境（如關稅新制、地緣衝突）對該公司的衝擊。判斷其為「受災戶」或「受惠者」，並評估供應鏈韌性。
+        💎 【內在價值審查分析】：根據毛利與 ROE 數據評估其「護城河」類型。判斷在 2026 年通膨環境下是否具備轉嫁成本的「定價權」。
+        📉 【股價走勢與動能判斷】：結合 KD、MACD、RSI 訊號。判斷目前是「法人佈局」還是「散戶非理性波動」。
+        🎯 【法人目標價與時間預估】：預估市場平均目標價，分析其合理性，並給出股價回歸價值的具體預估時間（如：1個季度、半年內）。
+        📈 【終極投資策略建議】：給出具體建議。包含：長線進場價位（價值面）、短線支撐價位（技術面）、停損價位（基本面轉弱點）。
         """
 
         summary_placeholder = st.empty()
-        summary_placeholder.info("⏳ AI 正在計算安全邊際並生成報告...")
+        summary_placeholder.info("📡 正在分析 2026 全球趨勢與量化數據...")
 
-        # 模型輪詢邏輯
         success = False
         try_models = [default_model] + [m for m in AVAILABLE_MODELS if m != default_model]
         
         for m_name in try_models:
             try:
                 response = client.models.generate_content(model=m_name, contents=prompt)
-                summary_placeholder.success(f"【推薦建議 - 由 {m_name} 生成】\n\n{response.text}")
+                summary_placeholder.markdown(response.text) # 使用 markdown 渲染結構化文字
                 success = True
                 break
-            except Exception as e:
-                if "429" in str(e): continue # 額度耗盡則試下一個
+            except:
                 continue
         
         if not success:
-            summary_placeholder.error("❌ 目前所有 AI 模型額度皆已耗盡，請一分鐘後再試。")
+            summary_placeholder.error("❌ 所有模型皆無法回應，請檢查 API 額度。")
 
         st.divider()
 
-        # C. 精簡數據表格
-        col_metrics, col_history = st.columns([1, 2])
-        
-        with col_metrics:
-            st.subheader("📋 詳細指標")
-            # 轉換為簡潔的垂直表格
-            metrics_df = pd.DataFrame([data]).T.rename(columns={0: "數值"})
-            st.table(metrics_df)
-            
-        with col_history:
-            st.subheader("📅 近 10 日交易明細")
-            # 格式化 Volume 加上千分位，提高閱讀性
-            st.dataframe(history.style.format({
-                'Open': '{:.2f}', 'High': '{:.2f}', 'Low': '{:.2f}', 
-                'Close': '{:.2f}', 'Volume': '{:,.0f}'
-            }), use_container_width=True)
+        # C. 底層數據表格
+        col_m, col_h = st.columns([1, 2])
+        with col_m:
+            st.table(pd.DataFrame([data]).T.rename(columns={0: "量化數值"}))
+        with col_h:
+            st.dataframe(history.style.format("{:.2f}"), use_container_width=True)
             
     else:
-        st.error("❌ 抓取不到數據。請確認代號（例：2330 或 2356）是否正確。")
+        st.error("無法抓取數據，請確認代號。")
