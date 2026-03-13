@@ -1,6 +1,6 @@
 streamlit>=1.30.0
 yfinance
-google-generativeai>=0.4.0
+google-generativeai>=0.5.0
 pandas-ta
 FinMind
 requests
