@@ -5,59 +5,68 @@ import pandas_ta as ta
 from FinMind.data import DataLoader
 import google.generativeai as genai
 from datetime import datetime, timedelta
+import requests
 
 # --- 1. 基礎設定 ---
 st.set_page_config(page_title="AI 股市首席分析報告", layout="centered")
 
-# 從 Secrets 讀取 Key
 if "GEMINI_API_KEY" not in st.secrets:
     st.error("請在 Secrets 中設定 GEMINI_API_KEY")
     st.stop()
 
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 
-# --- 2. 數據處理函式 ---
+# --- 2. 繞過封鎖的數據處理函式 ---
+@st.cache_data(ttl=3600) # 快取 1 小時，減少被封鎖機率
 def get_stock_data(ticker_id):
-    # 統一代號：FinMind 要純數字，yfinance 要 .TW
     pure_id = ticker_id.replace(".TW", "").replace(".TWO", "")
     full_id = f"{pure_id}.TW"
     
-    # (A) yfinance: 獲取股價與資訊
-    stock = yf.Ticker(full_id)
-    df = stock.history(period="1y")
-    info = stock.info
+    # 建立一個 Session 並模擬瀏覽器標頭，降低被 Yahoo 阻擋的風險
+    session = requests.Session()
+    session.headers.update({
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    })
     
-    if not df.empty:
-        # 計算技術指標並直接併入 df
-        df['RSI'] = ta.rsi(df['Close'], length=14)
-        df = pd.concat([df, ta.macd(df['Close']), ta.stoch(df['High'], df['Low'], df['Close'])], axis=1)
+    df = pd.DataFrame()
+    info = {}
     
-    # (B) FinMind: 獲取籌碼
+    try:
+        # 使用自定義 session 抓取
+        stock = yf.Ticker(full_id, session=session)
+        df = stock.history(period="1y")
+        info = stock.info
+        
+        if not df.empty:
+            df['RSI'] = ta.rsi(df['Close'], length=14)
+            df = pd.concat([df, ta.macd(df['Close']), ta.stoch(df['High'], df['Low'], df['Close'])], axis=1)
+    except Exception as e:
+        st.warning(f"⚠️ yfinance 暫時限制存取 (Rate Limit)，部分數據將受限。")
+
+    # (B) FinMind: 獲取籌碼 (這通常不會被封鎖，是很好的備案)
     df_inst = pd.DataFrame()
     try:
         dl = DataLoader()
+        # 如果你有 FinMind Token，建議在 Secrets 設定並在此處 login
         start_date = (datetime.now() - timedelta(days=45)).strftime('%Y-%m-%d')
         df_inst = dl.taiwan_stock_institutional_investors(stock_id=pure_id, start_date=start_date)
-    except:
-        pass
+    except Exception as e:
+        st.error(f"FinMind 籌碼數據獲取失敗: {e}")
     
     return df, df_inst, info
 
-# --- 3. 生成 Prompt (徹底解決 NameError) ---
+# --- 3. 生成 Prompt (增加數據缺失處理) ---
 def generate_cio_report(ticker, df, df_inst, info):
-    if len(df) < 2:
-        return "數據量不足以進行分析。"
-        
-    latest = df.iloc[-1]
-    prev = df.iloc[-2]
+    # 如果 yfinance 掛了，嘗試從有限的資訊或 FinMind 數據中分析
+    has_df = not df.empty
+    latest = df.iloc[-1] if has_df else {}
+    prev = df.iloc[-2] if has_df and len(df)>1 else {}
     
-    # 使用 .get() 確保變數存在，若不存在則給予 0.0
-    # 這裡的 Key 必須與 pandas_ta 產生的欄位名稱完全一致
     rsi_val = latest.get('RSI', 0.0)
     macd_val = latest.get('MACD_12_26_9', 0.0)
     k_val = latest.get('STOCHk_14_3_3', 0.0)
+    price = latest.get('Close', 0.0)
     
-    # 籌碼數據彙整
     f_net, t_net = "無數據", "無數據"
     if not df_inst.empty and 'Foreign_Investor_Buy' in df_inst.columns:
         last_5 = df_inst.tail(5)
@@ -66,11 +75,11 @@ def generate_cio_report(ticker, df, df_inst, info):
     
     prompt = f"""
     你是一位融合「價值投資」與「量化分析」的首席投資官 (CIO)。
-    請針對股票代號：{ticker} 進行極致詳細的專業分析。
+    請針對股票代號：{ticker} 進行詳細分析。
 
-    【當前真實數據快報】
-    - 當前股價：{latest['Close']:.2f} (昨日收盤：{prev['Close']:.2f})
-    - 財務狀況：毛利率 {info.get('grossMargins', 0)*100:.2f}% / ROE {info.get('returnOnEquity', 0)*100:.2f}%
+    【當前真實數據】
+    - 當前股價：{price}
+    - 財務指標：毛利 {info.get('grossMargins', '未知')}, ROE {info.get('returnOnEquity', '未知')}
     - 技術指標：RSI={rsi_val:.2f}, MACD={macd_val:.2f}, K值={k_val:.2f}
     - 籌碼動向：近五日外資累計買賣超 {f_net} 股, 投信累計買賣超 {t_net} 股
     
@@ -91,27 +100,22 @@ with st.sidebar:
     submit = st.button("生成深度報告", type="primary")
 
 if submit:
-    with st.spinner("🚀 正在收集數據並啟動 AI 推理..."):
+    with st.spinner("🚀 正在安全獲取數據中..."):
         df_data, df_inst, stock_info = get_stock_data(stock_code)
         
-        if df_data.empty:
-            st.error("找不到該股票數據，請確認代號。")
+        # 只要有籌碼或股價其中之一，就讓 AI 嘗試分析
+        if df_data.empty and df_inst.empty:
+            st.error("❌ 所有數據源均暫時無法存取，請稍後再試。")
         else:
             final_prompt = generate_cio_report(stock_code, df_data, df_inst, stock_info)
             
             try:
-                # 建立模型
                 model = genai.GenerativeModel('gemini-1.5-flash')
-                
-                # 呼叫 Gemini (可視情況開啟 Google Search 功能)
-                # model = genai.GenerativeModel('gemini-1.5-flash', tools=[{"google_search": {}}])
-                
                 response = model.generate_content(final_prompt)
                 
                 st.markdown(f"## 📊 {stock_code} 綜合研究報告")
                 st.markdown(response.text)
-                
                 st.divider()
                 st.download_button("📩 下載報告", response.text, file_name=f"{stock_code}_report.txt")
             except Exception as e:
-                st.error(f"AI 生成出錯：{e}")
+                st.error(f"AI 分析出錯：{e}")
