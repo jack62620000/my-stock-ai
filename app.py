@@ -123,7 +123,7 @@ RSI 指標：{rsi_val}
         # ===============================
         try:
             model = genai.GenerativeModel(
-                model_name="gemini-1.5-flash",
+                model_name="models/gemini-pro",
                 generation_config={
                     "temperature": 0.7,
                     "max_output_tokens": 1200,
@@ -138,3 +138,4 @@ RSI 指標：{rsi_val}
         except Exception as e:
             st.error("❌ Gemini AI 呼叫失敗")
             st.exception(e)
+
