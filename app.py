@@ -80,8 +80,7 @@ st.title("AI分析投資")
 
 with st.sidebar:
     stock_input = st.text_input("輸入台股代號", value="2330")
-    if AVAILABLE_MODELS:
-        default_model = st.selectbox("首選分析模型", AVAILABLE_MODELS)
+    default_model = st.selectbox("首選分析模型", AVAILABLE_MODELS)
     run_btn = st.button("生成五大核心報告", type="primary")
 
 if run_btn:
@@ -91,33 +90,33 @@ if run_btn:
         # A. 數據看板
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("目前價格", data["現價"])
-        c2.metric("ROE / 毛利", f"{data['ROE']}% / {data['毛利率']}%")
-        c3.metric("KD / RSI", f"{data['K值']} / {data['RSI14']}")
-        c4.metric("PE / PB", f"{data['PE']} / {data['PB']}")
+        c2.metric("基本面(ROE/毛利", f"{data['ROE']}% / {data['毛利率']}%")
+        c3.metric("技術面(KD/RSI)", f"{data['K值']} / {data['RSI14']}")
+        c4.metric("價值面(PE/PB)", f"{data['PE']} / {data['PB']}")
 
         st.divider()
 
         # B. 核心深度分析報告
-        st.subheader("📝 首席投資決策報告 (2026 版)")
+        st.subheader("📝分析報告")
         
         # 強化後的深度 Prompt
         prompt = f"""
-        你是一位精通 Python 數據分析與價值投資的量化投資工程師。請針對台股 {data['名稱']}({stock_input}) 撰寫 2026 年深度分析報告。
+        你是一位精通股票、期貨、原物料數據分析與價值投資的股票專業分析師。請針對台股 {data['名稱']}({stock_input})鑽寫台灣現在時間點上的深度分析報告。
         數據參考：
         - 財務：ROE {data['ROE']}%, 毛利 {data['毛利率']}%, PE {data['PE']}, PB {data['PB']}, 殖利率 {data['殖利率']}%
         - 技術：K/D {data['K值']}/{data['D值']}, MACD {data['MACD']}, RSI {data['RSI14']}, 乖離率 {data['乖離率%']}%
         
-        請嚴格依照下列五大模組撰寫，口氣需專業、理性、具備前瞻性：
-
+        請從台灣證交所的數據與提供給妳的數據來做下列五大模組的精確分析：
         🌍 【全球局勢與宏觀風險分析】：分析2026年當前全球環境局勢（如關稅新制、地緣衝突）對該公司的衝擊。判斷其為「受災戶」或「受惠者」，並評估供應鏈韌性。
         💎 【內在價值審查分析】：根據毛利與 ROE 數據評估其「護城河」類型。判斷在 2026 年通膨環境下是否具備轉嫁成本的「定價權」。
         📉 【股價走勢與動能判斷】：結合K/D值、MACD值、RSI值的數據判斷目前股價走勢是「法人佈局」還是「散戶非理性波動」。
         🎯 【法人目標價與時間預估】：預估市場平均目標價，分析其合理性，並給出明確股價與回歸價值的具體預估時間（如：1個季度、半年內）。
         📈 【終極投資策略建議】：給出具體明確的價位及建議，長線進場價位（價值面）、短線支撐價位（技術面）、停損價位（基本面轉弱點）的分析。
+        請嚴格依照上列五大模組撰寫，需專業、精準、理性、具備前瞻性。
         """
 
         summary_placeholder = st.empty()
-        summary_placeholder.info("📡 正在分析 2026 全球趨勢與量化數據...")
+        summary_placeholder.info("📡 正在分析數據...")
 
         success = False
         try_models = [default_model] + [m for m in AVAILABLE_MODELS if m != default_model]
@@ -145,6 +144,7 @@ if run_btn:
             
     else:
         st.error("無法抓取數據，請確認代號。")
+
 
 
 
