@@ -33,15 +33,31 @@ def generate_cio_report(ticker, df, df_inst, info):
     latest = df.iloc[-1]
     prev = df.iloc[-2]
     
-    # 計算技術指標文字化
-    rsi = ta.rsi(df['Close'], length=14).iloc[-1]
-    macd = ta.macd(df['Close']).iloc[-1]
-    kd = ta.stoch(df['High'], df['Low'], df['Close']).iloc[-1]
+    # --- 安全計算技術指標 ---
+    rsi = ta.rsi(df['Close'], length=14).iloc[-1] if 'Close' in df else 0
+    # 這裡確保 MACD 與 KD 欄位存在
+    macd_val = df.get('MACD_12_26_9', pd.Series([0])).iloc[-1]
+    k_val = df.get('STOCHk_14_3_3', pd.Series([0])).iloc[-1]
     
-    # 籌碼面摘要
-    inst_summary = df_inst.tail(5)
-    f_total = inst_summary['Foreign_Investor_Buy'].sum() - inst_summary['Foreign_Investor_Sell'].sum()
-    t_total = inst_summary['Investment_Trust_Buy'].sum() - inst_summary['Investment_Trust_Sell'].sum()
+    # --- 安全計算籌碼面 (解決 KeyError) ---
+    f_total, t_total = 0, 0
+    if not df_inst.empty:
+        # 檢查 FinMind 常見的兩種欄位命名格式
+        # 格式 A: Foreign_Investor_Buy / Foreign_Investor_Sell
+        # 格式 B: buy / sell (搭配 name 欄位篩選)
+        try:
+            if 'Foreign_Investor_Buy' in df_inst.columns:
+                inst_summary = df_inst.tail(5)
+                f_total = inst_summary['Foreign_Investor_Buy'].sum() - inst_summary['Foreign_Investor_Sell'].sum()
+                t_total = inst_summary['Investment_Trust_Buy'].sum() - inst_summary['Investment_Trust_Sell'].sum()
+            elif 'buy' in df_inst.columns and 'name' in df_inst.columns:
+                # 某些版本 FinMind 會把不同法人放在同一欄，用 name 區分
+                f_data = df_inst[df_inst['name'] == 'Foreign_Investor'].tail(5)
+                t_data = df_inst[df_inst['name'] == 'Investment_Trust'].tail(5)
+                f_total = f_data['buy'].sum() - f_data['sell'].sum()
+                t_total = t_data['buy'].sum() - t_data['sell'].sum()
+        except Exception as e:
+            f_total, t_total = "無資料", "無資料"
 
     prompt = f"""
     你是一位融合「價值投資」與「量化分析」的首席投資官 (CIO)。
@@ -95,3 +111,4 @@ if run_btn:
     
     st.divider()
     st.download_button("📩 下載報告文字", response.text, file_name=f"{stock_code}_report.txt")
+
