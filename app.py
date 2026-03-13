@@ -8,7 +8,7 @@ from datetime import datetime
 # ===============================
 # 1. 核心設定與 API 初始化
 # ===============================
-st.set_page_config(page_title="2026 AI 量化投資決策端", layout="wide")
+st.set_page_config(page_title="AI分析投資", layout="wide")
 
 if "GEMINI_API_KEY" not in st.secrets:
     st.error("❌ 請在 Streamlit Secrets 設定 GEMINI_API_KEY")
@@ -145,5 +145,6 @@ if run_btn:
             
     else:
         st.error("無法抓取數據，請確認代號。")
+
 
 
