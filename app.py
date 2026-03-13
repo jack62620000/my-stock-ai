@@ -16,15 +16,18 @@ st.set_page_config(
 
 st.title("🤖 首席分析師：AI 投資決策報告")
 
-# -------------------------------
-# Gemini API Key
-# -------------------------------
+# ===============================
+# 2. Gemini API 初始化（新 SDK，關鍵）
+# ===============================
 if "GEMINI_API_KEY" not in st.secrets:
     st.error("❌ 請在 Streamlit Secrets 設定 GEMINI_API_KEY")
     st.stop()
 
+# ⭐ 一定要在最上層定義（不能放進 if / try / function）
+client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
+
 # ===============================
-# 2. 資料抓取（含備援）
+# 3. 資料抓取（含備援）
 # ===============================
 @st.cache_data(ttl=3600)
 def get_stock_data(stock_id: str):
@@ -61,7 +64,7 @@ def get_stock_data(stock_id: str):
 
 
 # ===============================
-# 3. 側邊欄
+# 4. 側邊欄
 # ===============================
 with st.sidebar:
     stock_code = st.text_input("輸入台股代號（例如 2330）", value="2330")
@@ -69,7 +72,7 @@ with st.sidebar:
 
 
 # ===============================
-# 4. 主流程
+# 5. 主流程
 # ===============================
 if submit:
     with st.spinner("📡 收集市場資料並啟動 AI 分析中..."):
@@ -96,7 +99,7 @@ if submit:
                 pass
 
         # ===============================
-        # 5. Prompt
+        # 6. Prompt
         # ===============================
         prompt = f"""
 你是一位台股首席分析師，請針對以下股票進行專業投資分析：
@@ -117,7 +120,7 @@ RSI 指標：{rsi_val}
 """
 
         # ===============================
-        # 6. Gemini AI 分析（穩定版）
+        # 7. Gemini AI 分析（v1 API，穩定）
         # ===============================
         try:
             response = client.models.generate_content(
@@ -135,7 +138,3 @@ RSI 指標：{rsi_val}
         except Exception as e:
             st.error("❌ Gemini v1 API 呼叫失敗")
             st.exception(e)
-
-
-
-
