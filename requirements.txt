@@ -4,4 +4,6 @@ pandas>=1.5.0
 pandas-ta>=0.3.14b0
 FinMind>=1.6.0
 requests>=2.31.0
-google-generativeai==0.4.1
+
+# ✅ 新官方 Gemini SDK（關鍵）
+google-genai>=0.3.0
