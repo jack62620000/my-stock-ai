@@ -76,7 +76,7 @@ def get_advanced_quant_data(stock_id: str):
 # ===============================
 # 3. UI 介面
 # ===============================
-st.title("🤖 2026 AI 股市首席分析報告")
+st.title("AI分析投資")
 
 with st.sidebar:
     stock_input = st.text_input("輸入台股代號", value="2330")
@@ -145,6 +145,7 @@ if run_btn:
             
     else:
         st.error("無法抓取數據，請確認代號。")
+
 
 
 
