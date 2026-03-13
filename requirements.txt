@@ -1,10 +1,7 @@
 streamlit
-pandas
-numpy
 yfinance
+pandas
 pandas_ta
 plotly
-altair
+FinMind
 google-generativeai
-requests
-streamlit-lightweight-charts
