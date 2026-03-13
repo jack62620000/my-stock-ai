@@ -13,7 +13,6 @@ st.set_page_config(
     page_title="AI 股市首席分析報告",
     layout="centered"
 )
-
 st.title("🤖 AI 股市首席分析報告")
 
 # ===============================
@@ -52,11 +51,13 @@ def get_stock_data(stock_id: str):
 
     df_price = pd.DataFrame()
     df_inst = pd.DataFrame()
+    company_name = "未知公司"
 
-    # Yahoo Finance：價格 + RSI
+    # Yahoo Finance：價格 + RSI + 公司名稱
     try:
         ticker = yf.Ticker(yf_id)
         df_price = ticker.history(period="6mo")
+        company_name = ticker.info.get("shortName", company_name)
         if not df_price.empty:
             df_price["RSI"] = ta.rsi(df_price["Close"], length=14)
     except:
@@ -73,13 +74,13 @@ def get_stock_data(stock_id: str):
     except:
         pass
 
-    return df_price, df_inst
+    return df_price, df_inst, company_name
 
 # ===============================
 # 4. 側邊欄
 # ===============================
 with st.sidebar:
-    stock_code = st.text_input("輸入台股代號（例如 2330）", value="2330")
+    stock_code = st.text_input("輸入台股代號（例如 2330）", value="2356")
     submit = st.button("🚀 生成 AI 分析報告", type="primary")
 
 # ===============================
@@ -87,7 +88,7 @@ with st.sidebar:
 # ===============================
 if submit:
     with st.spinner("📡 收集資料並進行 AI 分析中..."):
-        df_price, df_inst = get_stock_data(stock_code)
+        df_price, df_inst, company_name = get_stock_data(stock_code)
 
         # 股價與 RSI
         current_price = round(df_price["Close"].iloc[-1], 2) if not df_price.empty else "無資料"
@@ -104,46 +105,39 @@ if submit:
             except:
                 pass
 
+        st.write(f"股票名稱確認：**{company_name}**")
+        st.write(f"目前股價：{current_price}，RSI：{rsi_val}，近五日外資買賣超：{foreign_net}")
+
         # 分段生成分析報告
         sections = [
-            "🌍 【全球局勢與宏觀風險分析】：分析2026年當前全球重大時事（如關稅新制、區域地緣衝突、主要國家通膨指標）對該公司的具體衝擊。請判斷該公司屬於「受災戶」還是「受惠者」，並評估其供應鏈的韌性。",
-            "💎 【內在價值審查分析】：根據提供的毛利與 ROE 數據，評估其「護城河」類型（無形資產、轉換成本、網絡效應或成本優勢）。在2026年的環境下，該公司是否具備轉嫁成本給消費者的「定價權」？",
-            "📉 【股價走勢與動能判斷】：綜合解讀 KD（超買/超賣）、MACD（趨勢轉折）、RSI（動能強弱）訊號。特別注意： 對比「法人買賣超數據」與「股價漲跌」，判斷目前是法人大戶有計畫的佈局，還是散戶情緒帶動的非理性波動。",
-            "🎯 【法人目標價與時間預估】：請參考 2026 年最新投顧報告摘要，列出市場對該股的平均目標價。若當前股價高於/低於目標價，請分析其合理性，並預估股價回歸合理價值所需的具體時間（如：1 個季度、半年內）。",
-            "📈 【終極投資策略建議】：請給出具體的「長線持有」或「短線避險」建議。請提供明確的：長線進場價位（基於價值估算）、短線支撐價位（基於技術指標）、停損價位（若跌破則基本面轉弱）。）"
+            "🌍 【全球局勢與宏觀風險分析】",
+            "💎 【內在價值審查分析】",
+            "📉 【股價走勢與動能判斷】",
+            "🎯 【法人目標價與時間預估】",
+            "📈 【終極投資策略建議】"
         ]
 
-        full_report = ""
         for sec in sections:
-            sec_prompt = f"""
-請針對以下股票撰寫專業分析，只分析 {sec}，用條列方式、專業語氣：
+            # 取得短標題：只抓 【】裡面的文字
+            short_title = sec.split("】")[1] if "】" in sec else sec
 
-股票代號：{stock_code}
+            sec_prompt = f"""
+請針對股票 {stock_code}（{company_name}）撰寫專業分析，只分析這一部分，用條列方式、專業語氣：
+分析主題：{sec}
 目前股價：{current_price}
 RSI 指標：{rsi_val}
 近五日外資買賣超：{foreign_net}
 """
 
+            st.markdown(f"### {short_title}")  # 顯示短標題
+
             try:
                 response = client.models.generate_content(
                     model=MODEL_NAME,
                     contents=sec_prompt,
-                    config={"temperature": 0.7, "max_output_tokens": 4000}  # 每段 800 token
+                    config={"temperature": 0.7, "max_output_tokens": 1800}  # 每段分開生成
                 )
-
-                if hasattr(response, "text"):
-                    text = response.text
-                elif hasattr(response, "candidates") and len(response.candidates) > 0:
-                    text = response.candidates[0].content
-                else:
-                    text = str(response)
-
-                full_report += f"### {sec}\n{text}\n\n"
-
+                text = response.text if hasattr(response, "text") else response.candidates[0].content
+                st.markdown(text)
             except Exception as e:
-                full_report += f"### {sec}\n❌ 生成失敗：{e}\n\n"
-
-        # 顯示完整報告
-        st.markdown(f"## 📊 {stock_code} AI 投資分析報告")
-        st.markdown(full_report)
-
+                st.markdown(f"❌ 生成失敗：{e}")
