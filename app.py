@@ -54,7 +54,8 @@ def generate_cio_report(ticker, df, df_inst, info):
         if 'Foreign_Investor_Buy' in cols:
             last_5 = df_inst.tail(5)
             f_net = last_5['Foreign_Investor_Buy'].sum() - last_5['Foreign_Investor_Sell'].sum()
-            t_net = last_5['Investment_Trust_Buy'].sum() - last_5['Investment_Trust_Sell'].sum()prompt = f"""
+            t_net = last_5['Investment_Trust_Buy'].sum() - last_5['Investment_Trust_Sell'].sum()
+    prompt = f"""
     你是一位融合「價值投資」與「量化分析」的首席投資官 (CIO)。
     請針對股票代號：{ticker} 進行極致詳細的專業分析。
 
@@ -101,3 +102,4 @@ if submit:
             
             st.divider()
             st.download_button("📩 下載報告", response.text, file_name=f"{stock_code}_report.txt")
+
