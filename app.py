@@ -17,17 +17,50 @@ st.set_page_config(
 st.title("🤖 首席分析師：AI 投資決策報告")
 
 # ===============================
-# 2. Gemini API 初始化（新 SDK，關鍵）
+# 2. Gemini API 初始化（新 SDK）
 # ===============================
 if "GEMINI_API_KEY" not in st.secrets:
     st.error("❌ 請在 Streamlit Secrets 設定 GEMINI_API_KEY")
     st.stop()
 
-# ⭐ 一定要在最上層定義（不能放進 if / try / function）
 client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 
 # ===============================
-# 3. 資料抓取（含備援）
+# 3. 偵測可用模型（關鍵）
+# ===============================
+@st.cache_data
+def get_available_model():
+    """
+    依優先順序選擇可用模型
+    """
+    preferred = [
+        "models/gemini-1.5-flash",
+        "models/gemini-1.5-pro",
+        "models/gemini-1.0-pro",  # ✅ 幾乎 100% 可用
+    ]
+
+    available = [
+        m.name for m in client.models.list()
+        if "generateContent" in m.supported_generation_methods
+    ]
+
+    for p in preferred:
+        if p in available:
+            return p
+
+    return None
+
+
+MODEL_NAME = get_available_model()
+
+if MODEL_NAME is None:
+    st.error("❌ 此 API Key 沒有任何可用的 Gemini 模型")
+    st.stop()
+
+st.info(f"✅ 使用模型：{MODEL_NAME}")
+
+# ===============================
+# 4. 資料抓取
 # ===============================
 @st.cache_data(ttl=3600)
 def get_stock_data(stock_id: str):
@@ -35,21 +68,16 @@ def get_stock_data(stock_id: str):
     yf_id = f"{pure_id}.TW"
 
     df_price = pd.DataFrame()
-    stock_info = {}
     df_inst = pd.DataFrame()
 
-    # --- Yahoo Finance（價格 & 技術指標）---
     try:
         ticker = yf.Ticker(yf_id)
         df_price = ticker.history(period="6mo")
-
         if not df_price.empty:
             df_price["RSI"] = ta.rsi(df_price["Close"], length=14)
-            stock_info = ticker.info
-    except Exception:
+    except:
         pass
 
-    # --- FinMind（法人籌碼）---
     try:
         dl = DataLoader()
         start_date = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
@@ -57,74 +85,56 @@ def get_stock_data(stock_id: str):
             stock_id=pure_id,
             start_date=start_date
         )
-    except Exception:
+    except:
         pass
 
-    return df_price, df_inst, stock_info
+    return df_price, df_inst
 
 
 # ===============================
-# 4. 側邊欄
+# 5. UI
 # ===============================
 with st.sidebar:
-    stock_code = st.text_input("輸入台股代號（例如 2330）", value="2330")
+    stock_code = st.text_input("輸入台股代號", value="2330")
     submit = st.button("🚀 生成深度分析報告", type="primary")
 
 
 # ===============================
-# 5. 主流程
+# 6. 主流程
 # ===============================
 if submit:
-    with st.spinner("📡 收集市場資料並啟動 AI 分析中..."):
-        df_price, df_inst, stock_info = get_stock_data(stock_code)
+    with st.spinner("📡 收集資料並進行 AI 分析中..."):
+        df_price, df_inst = get_stock_data(stock_code)
 
-        # --- 價格 ---
-        if not df_price.empty:
-            current_price = round(df_price["Close"].iloc[-1], 2)
-            rsi_val = round(df_price["RSI"].iloc[-1], 2)
-        else:
-            current_price = "無法取得"
-            rsi_val = "N/A"
+        price = df_price["Close"].iloc[-1] if not df_price.empty else "無資料"
+        rsi = df_price["RSI"].iloc[-1] if not df_price.empty else "N/A"
 
-        # --- 外資五日買賣超 ---
         foreign_net = "無資料"
         if not df_inst.empty:
-            try:
-                foreign_net = (
-                    df_inst["Foreign_Investor_Buy"].tail(5).sum()
-                    - df_inst["Foreign_Investor_Sell"].tail(5).sum()
-                )
-                foreign_net = int(foreign_net)
-            except Exception:
-                pass
+            foreign_net = int(
+                df_inst["Foreign_Investor_Buy"].tail(5).sum()
+                - df_inst["Foreign_Investor_Sell"].tail(5).sum()
+            )
 
-        # ===============================
-        # 6. Prompt
-        # ===============================
         prompt = f"""
-你是一位台股首席分析師，請針對以下股票進行專業投資分析：
+你是一位台股首席分析師，請分析以下股票：
 
 股票代號：{stock_code}
-目前股價：{current_price}
-RSI 指標：{rsi_val}
+目前股價：{price}
+RSI：{rsi}
 近五日外資買賣超：{foreign_net}
 
 請分段說明：
-1. 全球與產業趨勢影響
-2. 公司基本面與護城河
-3. 技術面與動能判斷
-4. 法人可能目標價區間（保守 / 中性 / 樂觀）
-5. 操作策略建議（短線 / 中長線）
-
-請用條列清楚、語氣專業、不誇大。
+1. 產業與總體環境
+2. 公司基本面
+3. 技術面與動能
+4. 法人合理目標價區間
+5. 操作策略建議
 """
 
-        # ===============================
-        # 7. Gemini AI 分析（v1 API，穩定）
-        # ===============================
         try:
             response = client.models.generate_content(
-                model="gemini-1.5-flash",
+                model=MODEL_NAME,
                 contents=prompt,
                 config={
                     "temperature": 0.7,
@@ -132,9 +142,9 @@ RSI 指標：{rsi_val}
                 }
             )
 
-            st.markdown(f"## 📊 {stock_code} AI 綜合研究報告")
+            st.markdown(f"## 📊 {stock_code} AI 投資分析報告")
             st.markdown(response.text)
 
         except Exception as e:
-            st.error("❌ Gemini v1 API 呼叫失敗")
+            st.error("❌ Gemini 呼叫失敗")
             st.exception(e)
