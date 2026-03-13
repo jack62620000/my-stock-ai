@@ -26,31 +26,23 @@ if "GEMINI_API_KEY" not in st.secrets:
 client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 
 # ===============================
-# 3. 可用模型列表（按優先順序 fallback）
+# 3. 自動取得可用模型
 # ===============================
-model_candidates = [
-    "models/gemini-2.5-flash",
-    "models/gemini-2.5-pro",
-    "models/gemini-pro-latest",
-    "models/gemini-flash-latest",
-    "models/gemini-2.0-flash",
-]
+try:
+    available_models = client.models.list()
+    gemini_models = [m.name for m in available_models if "gemini" in m.name]
 
-MODEL_NAME = None
-for name in model_candidates:
-    try:
-        # 嘗試取得模型資訊，確認可用
-        client.models.get(name)
-        MODEL_NAME = name
-        break
-    except Exception:
-        continue
+    if not gemini_models:
+        st.error("❌ 此 API Key 沒有任何可用的 Gemini 模型")
+        st.stop()
 
-if MODEL_NAME is None:
-    st.error("❌ 此 API Key 沒有任何可用的 Gemini 模型")
+    MODEL_NAME = gemini_models[0]  # 直接選第一個可用模型
+    st.info(f"✅ 使用模型：{MODEL_NAME}")
+
+except Exception as e:
+    st.error("❌ 無法取得可用模型")
+    st.exception(e)
     st.stop()
-
-st.info(f"✅ 使用模型：{MODEL_NAME}")
 
 # ===============================
 # 4. 資料抓取函式
