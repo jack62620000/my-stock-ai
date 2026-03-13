@@ -6,60 +6,55 @@ from FinMind.data import DataLoader
 import google.generativeai as genai
 from datetime import datetime, timedelta
 
-# --- 1. 初始化設定 ---
+# --- 1. 基礎設定 ---
 st.set_page_config(page_title="AI 股市首席分析報告", layout="centered")
 
-# 請在 Secrets 中設定您的 API Key
+# 從 Secrets 讀取 Key
 GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
 genai.configure(api_key=GEMINI_API_KEY)
 
-# --- 2. 高效數據抓取模組 ---
-def get_clean_data(ticker_id):
-    # (A) yfinance: 基礎股價與財報
+# --- 2. 數據處理函式 ---
+def get_stock_data(ticker_id):
+    # yfinance
     stock = yf.Ticker(f"{ticker_id}.TW")
-    df_yf = stock.history(period="1y")
+    df = stock.history(period="1y")
     info = stock.info
     
-    # (B) FinMind: 法人籌碼 (這部分對你的第3點與第4點至關重要)
-    dl = DataLoader()
-    # 若有 token 建議加上 dl.login_by_token(api_token=st.secrets["FINMIND_TOKEN"])
-    start_date = (datetime.now() - timedelta(days=45)).strftime('%Y-%m-%d')
-    df_inst = dl.taiwan_stock_institutional_investors(stock_id=ticker_id, start_date=start_date)
+    # 計算技術指標
+    if not df.empty:
+        df['RSI'] = ta.rsi(df['Close'], length=14)
+        macd_df = ta.macd(df['Close'])
+        kd_df = ta.stoch(df['High'], df['Low'], df['Close'])
+        df = pd.concat([df, macd_df, kd_df], axis=1)
     
-    return df_yf, df_inst, info
+    # FinMind 籌碼
+    dl = DataLoader()
+    start_date = (datetime.now() - timedelta(days=45)).strftime('%Y-%m-%d')
+    df_inst = dl.taiwan_stock_institutional_investors(
+        stock_id=ticker_id.replace(".TW",""), 
+        start_date=start_date
+    )
+    
+    return df, df_inst, info
 
-# --- 3. 核心 Prompt 工程 (整合你要求的五大分析) ---
+# --- 3. 生成 Prompt (修正 NameError & KeyError) ---
 def generate_cio_report(ticker, df, df_inst, info):
     latest = df.iloc[-1]
-    prev = df.iloc[-2]
     
-    # --- 安全計算技術指標 ---
-    rsi = ta.rsi(df['Close'], length=14).iloc[-1] if 'Close' in df else 0
-    # 這裡確保 MACD 與 KD 欄位存在
-    macd_val = df.get('MACD_12_26_9', pd.Series([0])).iloc[-1]
-    k_val = df.get('STOCHk_14_3_3', pd.Series([0])).iloc[-1]
+    # 安全取值邏輯：如果欄位不存在則顯示 0.0
+    rsi_val = latest.get('RSI', 0.0)
+    macd_val = latest.get('MACD_12_26_9', 0.0)
+    k_val = latest.get('STOCHk_14_3_3', 0.0)
     
-    # --- 安全計算籌碼面 (解決 KeyError) ---
-    f_total, t_total = 0, 0
+    # 籌碼計算
+    f_net, t_net = "無數據", "無數據"
     if not df_inst.empty:
-        # 檢查 FinMind 常見的兩種欄位命名格式
-        # 格式 A: Foreign_Investor_Buy / Foreign_Investor_Sell
-        # 格式 B: buy / sell (搭配 name 欄位篩選)
-        try:
-            if 'Foreign_Investor_Buy' in df_inst.columns:
-                inst_summary = df_inst.tail(5)
-                f_total = inst_summary['Foreign_Investor_Buy'].sum() - inst_summary['Foreign_Investor_Sell'].sum()
-                t_total = inst_summary['Investment_Trust_Buy'].sum() - inst_summary['Investment_Trust_Sell'].sum()
-            elif 'buy' in df_inst.columns and 'name' in df_inst.columns:
-                # 某些版本 FinMind 會把不同法人放在同一欄，用 name 區分
-                f_data = df_inst[df_inst['name'] == 'Foreign_Investor'].tail(5)
-                t_data = df_inst[df_inst['name'] == 'Investment_Trust'].tail(5)
-                f_total = f_data['buy'].sum() - f_data['sell'].sum()
-                t_total = t_data['buy'].sum() - t_data['sell'].sum()
-        except Exception as e:
-            f_total, t_total = "無資料", "無資料"
-
-    prompt = f"""
+        # 自動偵測 FinMind 欄位格式
+        cols = df_inst.columns
+        if 'Foreign_Investor_Buy' in cols:
+            last_5 = df_inst.tail(5)
+            f_net = last_5['Foreign_Investor_Buy'].sum() - last_5['Foreign_Investor_Sell'].sum()
+            t_net = last_5['Investment_Trust_Buy'].sum() - last_5['Investment_Trust_Sell'].sum()prompt = f"""
     你是一位融合「價值投資」與「量化分析」的首席投資官 (CIO)。
     請針對股票代號：{ticker} 進行極致詳細的專業分析。
 
@@ -78,37 +73,31 @@ def generate_cio_report(ticker, df, df_inst, info):
     """
     return prompt
 
-# --- 4. 網頁 UI 佈局 ---
+# --- 4. Streamlit UI ---
 st.title("🤖 首席分析師：AI 投資決策報告")
-st.markdown("---")
 
 with st.sidebar:
-    st.header("⚙️ 參數設定")
     stock_code = st.text_input("輸入台股代號", value="2330")
-    run_btn = st.button("生成深度報告", type="primary")
-    st.info("此報告結合 yfinance 股價、FinMind 籌碼以及 Gemini 1.5 實時分析。")
+    submit = st.button("生成深度報告", type="primary")
 
-if run_btn:
-    with st.status("🚀 正在執行多維度分析...", expanded=True) as status:
-        st.write("正在從 TWSE/FinMind 抓取真實數據...")
-        df_yf, df_inst, info = get_clean_data(stock_code)
+if submit:
+    with st.spinner("🚀 正在收集數據並啟動 AI 推理..."):
+        df, df_inst, info = get_stock_data(stock_code)
         
-        st.write("正在整合技術指標與籌碼動向...")
-        full_prompt = generate_cio_report(stock_code, df_yf, df_inst, info)
-        
-        st.write("正在啟動 AI 深度推理 (Gemini 1.5)...")
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        response = model.generate_content(full_prompt)
-        
-        status.update(label="✅ 分析完成", state="complete", expanded=False)
-
-    # 顯示結果
-    st.markdown(f"## 📊 {stock_code} 綜合研究報告")
-    st.caption(f"報告生成時間：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    
-    # 呈現 AI 內容
-    st.markdown(response.text)
-    
-    st.divider()
-    st.download_button("📩 下載報告文字", response.text, file_name=f"{stock_code}_report.txt")
-
+        if df.empty:
+            st.error("找不到股票數據，請確認代號是否正確。")
+        else:
+            full_prompt = generate_cio_report(stock_code, df, df_inst, info)
+            
+            # 呼叫 Gemini
+            model = genai.GenerativeModel('gemini-1.5-flash')
+            # 若要開啟聯網功能，請確保 API 權限並改用：
+            # model = genai.GenerativeModel('gemini-1.5-flash', tools=[{"google_search": {}}])
+            
+            response = model.generate_content(full_prompt)
+            
+            st.markdown(f"## 📊 {stock_code} 綜合研究報告")
+            st.markdown(response.text)
+            
+            st.divider()
+            st.download_button("📩 下載報告", response.text, file_name=f"{stock_code}_report.txt")
