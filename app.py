@@ -3,7 +3,7 @@ import yfinance as yf
 import pandas as pd
 import pandas_ta as ta
 from FinMind.data import DataLoader
-import google.generativeai as genai
+from google import genai
 from datetime import datetime, timedelta
 
 # ===============================
@@ -122,20 +122,20 @@ RSI 指標：{rsi_val}
         # 6. Gemini AI 分析（穩定版）
         # ===============================
         try:
-            model = genai.GenerativeModel(
-                model_name="models/gemini-pro",
-                generation_config={
-                    "temperature": 0.7,
-                    "max_output_tokens": 1200,
-                }
-            )
+    response = client.models.generate_content(
+        model="gemini-1.5-flash",
+        contents=prompt,
+        config={
+            "temperature": 0.7,
+            "max_output_tokens": 1200,
+        }
+    )
 
-            response = model.generate_content(prompt)
+    st.markdown(f"## 📊 {stock_code} AI 綜合研究報告")
+    st.markdown(response.text)
 
-            st.markdown(f"## 📊 {stock_code} AI 綜合研究報告")
-            st.markdown(response.text)
+except Exception as e:
+    st.error("❌ Gemini v1 API 呼叫失敗")
+    st.exception(e)
 
-        except Exception as e:
-            st.error("❌ Gemini AI 呼叫失敗")
-            st.exception(e)
 
