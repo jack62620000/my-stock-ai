@@ -5,7 +5,7 @@ import pandas_ta as ta
 from google import genai
 
 # ===============================
-# 1. 初始化與 Secrets 檢查
+# 1. 基礎設定與模型初始化
 # ===============================
 st.set_page_config(page_title="量化數據終端", layout="wide")
 
@@ -15,23 +15,27 @@ if "GEMINI_API_KEY" not in st.secrets:
 
 client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 
-# ===============================
-# 2. 自動取得可用模型清單
-# ===============================
+# 改良版的模型偵測邏輯
 @st.cache_resource
-def get_available_models():
+def get_best_models():
     try:
-        # 獲取所有支援 generateContent 的模型
-        models = client.models.list()
-        # 過濾出 flash 系列（速度快、適合量化分析）
-        valid_models = [m.name for m in models if "generateContent" in m.supported_methods]
-        return valid_models
+        # 獲取所有模型名稱
+        all_models = [m.name for m in client.models.list()]
+        # 過濾出 gemini 系列並排序（優先讓 flash 排前面，因為速度快且額度高）
+        gemini_models = [m for m in all_models if "gemini" in m.lower()]
+        
+        # 排序邏輯：將 2.0-flash 或 1.5-flash 排在最前面
+        gemini_models.sort(key=lambda x: ("flash" not in x, "2.0" not in x))
+        
+        return gemini_models
     except Exception as e:
-        st.error(f"無法獲取模型清單: {e}")
+        st.error(f"❌ 無法取得可用模型清單：{e}")
         return []
 
+AVAILABLE_MODELS = get_best_models()
+
 # ===============================
-# 3. 數據處理
+# 2. 數據處理 (純數據)
 # ===============================
 @st.cache_data(ttl=3600)
 def get_quant_data(stock_id: str):
@@ -51,7 +55,7 @@ def get_quant_data(stock_id: str):
             "PE": info.get("trailingPE", 0),
             "PB": info.get("priceToBook", 0),
             "殖利率": (info.get("dividendYield", 0) or 0) * 100,
-            "RSI14": df['RSI'].iloc[-1],
+            "RSI14": df['RSI'].iloc[-1] if not df['RSI'].empty else 0,
             "乖離率%": ((df['Close'].iloc[-1] / df['MA20'].iloc[-1]) - 1) * 100 if not df['MA20'].empty else 0
         }
         return metrics, df.tail(10)
@@ -59,19 +63,19 @@ def get_quant_data(stock_id: str):
         return None, None
 
 # ===============================
-# 4. UI 介面
+# 3. UI 介面
 # ===============================
-st.title("🛡️ 量化價值決策核心 (自動修復版)")
+st.title("📊 量化數據終端 (自動模型匹配版)")
 
 with st.sidebar:
     stock_input = st.text_input("輸入台股代號", value="2330")
-    run_btn = st.button("啟動量化分析", type="primary")
-    
-    available_models = get_available_models()
-    if available_models:
-        st.success(f"偵測到 {len(available_models)} 個可用模型")
+    if AVAILABLE_MODELS:
+        st.success(f"✅ 偵測到 {len(AVAILABLE_MODELS)} 個可用模型")
+        # 讓使用者知道目前預設用哪一個，也可以手動選
+        selected_model = st.selectbox("偏好模型", AVAILABLE_MODELS)
     else:
-        st.error("此 API Key 目前無可用模型")
+        st.error("⚠️ 無可用模型，請檢查 API Key")
+    run_btn = st.button("執行分析", type="primary")
 
 if run_btn:
     data, history = get_quant_data(stock_input)
@@ -86,38 +90,40 @@ if run_btn:
 
         st.divider()
 
-        # 第二層：AI 總結 (具備自動輪詢重試機制)
+        # 第二層：AI 決策總結 (核心)
         st.subheader("🤖 AI 首席決策總結")
+        prompt = f"分析台股 {data['名稱']}({stock_input}): PE={data['PE']}, PB={data['PB']}, RSI={data['RSI14']:.2f}。請給出投資評等與理由。"
         
-        prompt = f"分析台股 {data['名稱']}({stock_input}): PE={data['PE']}, PB={data['PB']}, RSI={data['RSI14']:.2f}。請給出投資建議與理由。"
-        
-        summary_placeholder = st.empty()
-        summary_placeholder.info("⏳ 正在嘗試最適合的模型...")
-        
+        status_box = st.empty()
+        status_box.info("📡 正在調用模型進行分析...")
+
+        # 這裡加入你的自動模型匹配邏輯
         success = False
-        # 這裡會按照模型清單一個一個試，直到成功
-        for model_name in available_models:
+        # 優先用選定的模型，如果失敗則輪詢清單中其他模型
+        try_list = [selected_model] + [m for m in AVAILABLE_MODELS if m != selected_model]
+        
+        for m_name in try_list:
             try:
-                response = client.models.generate_content(model=model_name, contents=prompt)
-                summary_placeholder.success(f"推薦建議 (由 {model_name} 生成):\n\n{response.text}")
+                response = client.models.generate_content(model=m_name, contents=prompt)
+                status_box.success(f"【推薦建議 - 由 {m_name} 生成】\n\n{response.text}")
                 success = True
-                break # 成功就跳出迴圈
+                break
             except Exception as e:
-                continue # 失敗就試下一個
+                if "429" in str(e):
+                    status_box.warning(f"⚠️ {m_name} 額度滿了，正在嘗試下一個...")
+                continue
         
         if not success:
-            summary_placeholder.error("❌ 所有可用模型皆暫時無法回應（額度耗盡或區域限制），請稍後再試。")
+            status_box.error("❌ 所有模型皆無法回應，可能是 API 額度已達每日上限。")
 
         st.divider()
 
-        # 第三層：純數據展示
-        col_list, col_table = st.columns([1, 2])
-        with col_list:
-            st.subheader("📋 量化指標清單")
-            st.table(pd.DataFrame([data]).T.rename(columns={0: "數值"}))
-        with col_table:
-            st.subheader("📅 近 10 日交易數據")
+        # 第三層：純數據表格
+        st.subheader("📋 詳細量化指標與數據")
+        col_a, col_b = st.columns([1, 2])
+        with col_a:
+            st.table(pd.DataFrame([data]).T.rename(columns={0: "數據值"}))
+        with col_b:
             st.dataframe(history[['Open', 'High', 'Low', 'Close', 'Volume']].style.format("{:.2f}"))
-            
     else:
         st.error("查無數據。")
