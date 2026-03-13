@@ -131,8 +131,17 @@ RSI 指標：{rsi_val}
                 config={"temperature": 0.7, "max_output_tokens": 1200}
             )
 
+            # --- 修正這裡，確保抓到完整文字 ---
+            if hasattr(response, "text"):
+                ai_text = response.text
+            elif hasattr(response, "candidates"):
+                # 選第一個候選
+                ai_text = response.candidates[0].content
+            else:
+                ai_text = str(response)
+        
             st.markdown(f"## 📊 {stock_code} AI 投資分析報告")
-            st.markdown(response.text)
+            st.markdown(ai_text)
 
         except Exception as e:
             st.error("❌ Gemini 呼叫失敗")
