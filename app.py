@@ -14,7 +14,7 @@ st.set_page_config(
     layout="centered"
 )
 
-st.title("🤖 首席分析師：AI 投資決策報告")
+st.title("🤖 AI 股市首席分析報告")
 
 # ===============================
 # 2. Gemini API 初始化
@@ -25,9 +25,7 @@ if "GEMINI_API_KEY" not in st.secrets:
 
 client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 
-# ===============================
-# 3. 自動取得可用模型
-# ===============================
+# 自動取得可用 Gemini 模型
 try:
     available_models = client.models.list()
     gemini_models = [m.name for m in available_models if "gemini" in m.name]
@@ -36,7 +34,7 @@ try:
         st.error("❌ 此 API Key 沒有任何可用的 Gemini 模型")
         st.stop()
 
-    MODEL_NAME = gemini_models[0]  # 直接選第一個可用模型
+    MODEL_NAME = gemini_models[0]  # 選第一個可用模型
     st.info(f"✅ 使用模型：{MODEL_NAME}")
 
 except Exception as e:
@@ -45,7 +43,7 @@ except Exception as e:
     st.stop()
 
 # ===============================
-# 4. 資料抓取函式
+# 3. 抓取股票數據函式
 # ===============================
 @st.cache_data(ttl=3600)
 def get_stock_data(stock_id: str):
@@ -78,20 +76,20 @@ def get_stock_data(stock_id: str):
     return df_price, df_inst
 
 # ===============================
-# 5. 側邊欄
+# 4. 側邊欄
 # ===============================
 with st.sidebar:
     stock_code = st.text_input("輸入台股代號（例如 2330）", value="2330")
-    submit = st.button("🚀 生成深度分析報告", type="primary")
+    submit = st.button("🚀 生成 AI 分析報告", type="primary")
 
 # ===============================
-# 6. 主流程
+# 5. 主流程
 # ===============================
 if submit:
     with st.spinner("📡 收集資料並進行 AI 分析中..."):
         df_price, df_inst = get_stock_data(stock_code)
 
-        # 價格
+        # 股價與 RSI
         current_price = round(df_price["Close"].iloc[-1], 2) if not df_price.empty else "無資料"
         rsi_val = round(df_price["RSI"].iloc[-1], 2) if not df_price.empty else "N/A"
 
@@ -125,9 +123,7 @@ RSI 指標：{rsi_val}
 請用條列清楚、語氣專業、不誇大。
 """
 
-        # ===============================
-        # 7. 呼叫 Gemini AI
-        # ===============================
+        # 呼叫 Gemini AI
         try:
             response = client.models.generate_content(
                 model=MODEL_NAME,
@@ -141,4 +137,3 @@ RSI 指標：{rsi_val}
         except Exception as e:
             st.error("❌ Gemini 呼叫失敗")
             st.exception(e)
-
