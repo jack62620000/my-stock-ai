@@ -1,55 +1,151 @@
 import streamlit as st
+import yfinance as yf
+import pandas as pd
+import pandas_ta as ta
+from FinMind.data import DataLoader
 from google import genai
+from datetime import datetime, timedelta
 
+# ===============================
+# 1. 基礎設定
+# ===============================
 st.set_page_config(
-    page_title="Gemini API Key 測試工具",
+    page_title="AI 股市首席分析報告",
     layout="centered"
 )
 
-st.title("🤖 Gemini API Key 測試工具")
+st.title("🤖 首席分析師：AI 投資決策報告")
 
-# -------------------------------
-# 1. 輸入 API Key
-# -------------------------------
-st.info("請將你的 GEMINI API Key 輸入下方，測試是否可用。")
-api_key = st.text_input("GEMINI_API_KEY", type="password")
+# ===============================
+# 2. Gemini API 初始化
+# ===============================
+if "GEMINI_API_KEY" not in st.secrets:
+    st.error("❌ 請在 Streamlit Secrets 設定 GEMINI_API_KEY")
+    st.stop()
 
-if api_key:
+client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
+
+# ===============================
+# 3. 可用模型列表（按優先順序 fallback）
+# ===============================
+model_candidates = [
+    "models/gemini-2.5-flash",
+    "models/gemini-2.5-pro",
+    "models/gemini-pro-latest",
+    "models/gemini-flash-latest",
+    "models/gemini-2.0-flash",
+]
+
+MODEL_NAME = None
+for name in model_candidates:
     try:
-        client = genai.Client(api_key=api_key)
+        # 嘗試取得模型資訊，確認可用
+        client.models.get(name)
+        MODEL_NAME = name
+        break
+    except Exception:
+        continue
 
-        # -------------------------------
-        # 2. 列出可用模型
-        # -------------------------------
-        st.info("正在列出帳號可用 Gemini 模型...")
-        models = client.models.list()
+if MODEL_NAME is None:
+    st.error("❌ 此 API Key 沒有任何可用的 Gemini 模型")
+    st.stop()
 
-        if not models:
-            st.error("❌ 此 API Key 沒有任何可用的 Gemini 模型。")
-        else:
-            st.success(f"✅ 找到 {len(models)} 個可用模型")
-            for m in models:
-                st.write(f"- {m.name}")
+st.info(f"✅ 使用模型：{MODEL_NAME}")
 
-            # -------------------------------
-            # 3. 測試生成文字
-            # -------------------------------
-            st.info("正在嘗試生成測試文字...")
-            test_model = models[0].name
-            prompt = "請用一句話說明台灣股市的今日行情。"
+# ===============================
+# 4. 資料抓取函式
+# ===============================
+@st.cache_data(ttl=3600)
+def get_stock_data(stock_id: str):
+    pure_id = stock_id.replace(".TW", "").replace(".TWO", "")
+    yf_id = f"{pure_id}.TW"
 
+    df_price = pd.DataFrame()
+    df_inst = pd.DataFrame()
+
+    # Yahoo Finance：價格 + RSI
+    try:
+        ticker = yf.Ticker(yf_id)
+        df_price = ticker.history(period="6mo")
+        if not df_price.empty:
+            df_price["RSI"] = ta.rsi(df_price["Close"], length=14)
+    except:
+        pass
+
+    # FinMind：法人籌碼
+    try:
+        dl = DataLoader()
+        start_date = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
+        df_inst = dl.taiwan_stock_institutional_investors(
+            stock_id=pure_id,
+            start_date=start_date
+        )
+    except:
+        pass
+
+    return df_price, df_inst
+
+# ===============================
+# 5. 側邊欄
+# ===============================
+with st.sidebar:
+    stock_code = st.text_input("輸入台股代號（例如 2330）", value="2330")
+    submit = st.button("🚀 生成深度分析報告", type="primary")
+
+# ===============================
+# 6. 主流程
+# ===============================
+if submit:
+    with st.spinner("📡 收集資料並進行 AI 分析中..."):
+        df_price, df_inst = get_stock_data(stock_code)
+
+        # 價格
+        current_price = round(df_price["Close"].iloc[-1], 2) if not df_price.empty else "無資料"
+        rsi_val = round(df_price["RSI"].iloc[-1], 2) if not df_price.empty else "N/A"
+
+        # 外資五日買賣超
+        foreign_net = "無資料"
+        if not df_inst.empty:
             try:
-                response = client.models.generate_content(
-                    model=test_model,
-                    contents=prompt,
-                    config={"temperature": 0.7, "max_output_tokens": 100}
+                foreign_net = int(
+                    df_inst["Foreign_Investor_Buy"].tail(5).sum() -
+                    df_inst["Foreign_Investor_Sell"].tail(5).sum()
                 )
-                st.success(f"✅ 成功使用模型 {test_model} 生成文字")
-                st.markdown(f"**生成結果：**\n\n{response.text}")
-            except Exception as e:
-                st.error("❌ 模型呼叫失敗")
-                st.exception(e)
+            except:
+                pass
 
-    except Exception as e:
-        st.error("❌ API Key 無法使用或初始化失敗")
-        st.exception(e)
+        # AI 分析 prompt
+        prompt = f"""
+你是一位台股首席分析師，請針對以下股票進行專業投資分析：
+
+股票代號：{stock_code}
+目前股價：{current_price}
+RSI 指標：{rsi_val}
+近五日外資買賣超：{foreign_net}
+
+請分段說明：
+1. 全球與產業趨勢影響
+2. 公司基本面與護城河
+3. 技術面與動能判斷
+4. 法人可能目標價區間（保守 / 中性 / 樂觀）
+5. 操作策略建議（短線 / 中長線）
+
+請用條列清楚、語氣專業、不誇大。
+"""
+
+        # ===============================
+        # 7. 呼叫 Gemini AI
+        # ===============================
+        try:
+            response = client.models.generate_content(
+                model=MODEL_NAME,
+                contents=prompt,
+                config={"temperature": 0.7, "max_output_tokens": 1200}
+            )
+
+            st.markdown(f"## 📊 {stock_code} AI 投資分析報告")
+            st.markdown(response.text)
+
+        except Exception as e:
+            st.error("❌ Gemini 呼叫失敗")
+            st.exception(e)
