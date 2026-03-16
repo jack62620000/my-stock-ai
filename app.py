@@ -42,95 +42,94 @@ AVAILABLE_MODELS = get_available_models()
 @st.cache_data(ttl=3600)
 def get_advanced_quant_data(stock_id: str):
     raw_id = stock_id.split('.')[0]
+    df = pd.DataFrame()
+    current_price = 0
     
-    # --- 步驟 1: 透過 TWSE / yf 確定上市或上櫃並獲取 K 線 ---
-    ticker_id = f"{raw_id}.TW"
-    ticker = yf.Ticker(ticker_id)
-    df = ticker.history(period="1y")
+    # --- 防火牆 1: 優先嘗試從 FinMind 拿 K 線 (避開 yfinance) ---
+    try:
+        # FinMind 的 K 線數據非常穩，且不會因為 yfinance 被封而受影響
+        df_fm = FM_DATA_LOADER.get_data(
+            dataset="TaiwanStockPrice",
+            stock_id=raw_id,
+            start_date=(datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d')
+        )
+        if not df_fm.empty:
+            # 轉換欄位名稱以符合你原本的技術指標邏輯
+            df = df_fm.rename(columns={
+                'open': 'Open', 'high': 'High', 'low': 'Low', 
+                'close': 'Close', 'Revenue': 'Volume', 'date': 'Date'
+            })
+            df.set_index('Date', inplace=True)
+            df.index = pd.to_datetime(df.index)
+            current_price = df['Close'].iloc[-1]
+    except Exception as e:
+        st.warning(f"⚠️ FinMind K線抓取失敗，嘗試備援方案...")
+
+    # --- 防火牆 2: 如果 FinMind 沒抓到，才去碰 yfinance (包在 try 裡) ---
     if df.empty:
-        ticker_id = f"{raw_id}.TWO"
-        ticker = yf.Ticker(ticker_id)
-        df = ticker.history(period="1y")
-    
-    if df.empty: return None, None
+        try:
+            ticker = yf.Ticker(f"{raw_id}.TW")
+            df = ticker.history(period="1y")
+            if df.empty:
+                df = yf.Ticker(f"{raw_id}.TWO").history(period="1y")
+            current_price = df['Close'].iloc[-1]
+        except Exception as e:
+            st.error("🚫 Yahoo Finance 目前拒絕連線 (Rate Limit)。")
+            # 防火牆 3: 最後一招，從證交所 OpenAPI 拿今天最後一個價格
+            try:
+                res = requests.get("https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_AVG_ALL", timeout=5).json()
+                for item in res:
+                    if item['Code'] == raw_id:
+                        current_price = float(item['ClosingPrice'])
+                        break
+            except: pass
+
+    # 如果連價格都沒有，就真的無法分析
+    if current_price == 0: return None, None
 
     try:
-        # --- 步驟 2: 使用 FinMind 抓取精準財報 (ROE/毛利) ---
-        # 抓取最近一年的損益表與資產負債表
-        start_date = (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d')
-        
-        # 取得財報數據
+        # --- 財報抓取 (維持之前的 FinMind 邏輯) ---
         df_financials = FM_DATA_LOADER.get_data(
             dataset="TaiwanStockFinancialStatements",
             stock_id=raw_id,
-            start_date=start_date
+            start_date=(datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d')
         )
         
-        def fm_extract(data_type, default=0):
+        def fm_extract(data_type):
             try:
-                # FinMind 財報數據的欄位通常是 'type' 和 'value'
                 filtered = df_financials[df_financials['type'] == data_type]
-                if not filtered.empty:
-                    return float(filtered.iloc[-1]['value'])
-                return default
-            except: 
-                return default
+                return float(filtered.iloc[-1]['value']) if not filtered.empty else 0
+            except: return 0
 
-        # 這裡要注意：FinMind 的 type 名稱要精確
-        # ROE 通常對應 'Return_on_Equity_A_Percent'
-        # 毛利率通常對應 'Gross_Profit_Margin'
-        roe = fm_extract('Return_on_Equity_A_Percent') 
+        roe = fm_extract('Return_on_Equity_A_Percent')
         gross_margin = fm_extract('Gross_Profit_Margin')
 
-        # 提取核心指標
-        roe = fm_extract('Return_on_Equity_A_Percent') # ROE
-        gross_margin = fm_extract('Gross_Profit_Margin') # 毛利率
-        
-        # --- 步驟 3: 使用 TWSE OpenAPI 校正價格 (預防 Yahoo 抽風) ---
-        current_price = df['Close'].iloc[-1]
-        try:
-            twse_url = "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_AVG_ALL"
-            res = requests.get(twse_url, timeout=5).json()
-            for item in res:
-                if item['Code'] == raw_id:
-                    current_price = float(item['ClosingPrice'])
-                    break
-        except: pass
+        # --- 技術指標計算 (確保 df 不為空) ---
+        if not df.empty:
+            df.ta.stoch(high='High', low='Low', k=9, d=3, append=True)
+            df.ta.macd(fast=12, slow=26, signal=9, append=True)
+            df['RSI'] = ta.rsi(df['Close'], length=14)
+            df['MA20'] = ta.sma(df['Close'], length=20)
+            df = df.fillna(0)
 
-        # --- 步驟 4: 計算技術指標 (pandas_ta) ---
-        df.ta.stoch(high='High', low='Low', k=9, d=3, append=True)
-        df.ta.macd(fast=12, slow=26, signal=9, append=True)
-        df['RSI'] = ta.rsi(df['Close'], length=14)
-        df['MA20'] = ta.sma(df['Close'], length=20)
-        df = df.fillna(0)
-
-        # --- 步驟 5: 封裝數據 ---
-        info = {}
-        try: info = ticker.info # 僅作為 PE/PB 備援
-        except: pass
-
+        # --- 封裝數據 ---
         metrics = {
-            "名稱": info.get("shortName") or f"台股 {raw_id}",
+            "名稱": f"台股 {raw_id}", # 既然 info 抓不到，我們直接顯示代碼
             "現價": round(current_price, 2),
-            "PE": round(info.get("trailingPE", 0) or 0, 2),
-            "PB": round(info.get("priceToBook", 0) or 0, 2),
-            # 如果 FinMind 沒抓到，就用 yfinance 的 (即便可能是 0)，至少不會報錯
-            "ROE": round(roe if roe != 0 else (info.get("returnOnEquity", 0)*100), 2),
-            "毛利率": round(gross_margin if gross_margin != 0 else (info.get("grossMargins", 0)*100), 2),
-            "殖利率": round((info.get("dividendYield", 0) or 0) * 100, 2),
-            "K值": round(df.get('STOCHk_9_3_3', [0])[-1], 2), # 使用 .get 防止欄位缺失
-            "D值": round(df.get('STOCHd_9_3_3', [0])[-1], 2),
-            "MACD": round(df.get('MACD_12_26_9', [0])[-1], 2),
-            "RSI14": round(df.get('RSI', [0])[-1], 2),
-            "乖離率%": round(((current_price / df['MA20'].iloc[-1]) - 1) * 100, 2)
+            "PE": 0, "PB": 0, # yfinance 封鎖時這些難以取得，設為 0
+            "ROE": round(roe, 2),
+            "毛利率": round(gross_margin, 2),
+            "殖利率": 0,
+            "K值": round(df['STOCHk_9_3_3'].iloc[-1], 2) if 'STOCHk_9_3_3' in df else 0,
+            "D值": round(df['STOCHd_9_3_3'].iloc[-1], 2) if 'STOCHd_9_3_3' in df else 0,
+            "MACD": round(df['MACD_12_26_9'].iloc[-1], 2) if 'MACD_12_26_9' in df else 0,
+            "RSI14": round(df['RSI'].iloc[-1], 2) if 'RSI' in df else 0,
+            "乖離率%": round(((current_price / df['MA20'].iloc[-1]) - 1) * 100, 2) if 'MA20' in df else 0
         }
         
-        recent_history = df.tail(10).copy()
-        recent_history.index = recent_history.index.strftime('%Y-%m-%d')
-        
-        return metrics, recent_history
+        return metrics, df.tail(10)
     except Exception as e:
-        st.error(f"數據解析出錯: {e}")
+        st.error(f"⚠️ 數據整合發生錯誤: {e}")
         return None, None
 
 # ===============================
