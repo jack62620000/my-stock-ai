@@ -107,18 +107,20 @@ def get_advanced_quant_data(stock_id: str):
             roe = get_val(df_fin, 'Return_on_Equity_A_Percent')
             gross_margin = get_val(df_fin, 'Gross_Profit_Margin')
     except: pass
-        dividend_yield = 0
-        try:
-            df_div = FM_DATA_LOADER.get_data(
-                dataset="TaiwanStockDividend",
-                stock_id=raw_id,
-                start_date=(datetime.now() - timedelta(days=730)).strftime('%Y-%m-%d')
-            )
-            if not df_div.empty:
-            # 計算近一年股利總和 / 現價
+    dividend_yield = 0
+    try:
+        df_div = FM_DATA_LOADER.get_data(
+            dataset="TaiwanStockDividend",
+            stock_id=raw_id,
+            start_date=(datetime.now() - timedelta(days=730)).strftime('%Y-%m-%d')
+        )
+        if not df_div.empty:
+            # 安全檢查：確保有 CashDividend 欄位
+            if 'CashDividend' in df_div.columns:
                 yearly_div = df_div.groupby(df_div['date'].dt.year)['CashDividend'].sum().iloc[-1]
                 dividend_yield = (yearly_div / current_price) * 100
-        except: pass
+    except:
+        dividend_yield = 0
     # --- 4. 計算技術指標 (使用 pandas_ta) ---
     try:
         df.ta.stoch(high='High', low='Low', close='Close', k=9, d=3, append=True)
