@@ -55,9 +55,10 @@ def get_advanced_quant_data(stock_id: str):
         # 警告：info 請求非常不穩定，若失敗則給予預設值
         try:
             info = ticker.info
+            stock_name = info.get('longName') or info.get('shortName') or f"台股 {stock_id}"
             time.sleep(0.5) # 微小延遲保護
         except:
-            info = {}
+            stock_name = f"台股代號 {stock_id}" # 抓不到就給代號，避免 AI 瞎猜
 
         # 3. 技術指標計算 (保持你的 pandas_ta 邏輯)
         df.ta.stoch(high='High', low='Low', k=9, d=3, append=True)
