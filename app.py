@@ -60,15 +60,27 @@ def get_advanced_quant_data(stock_id: str):
         start_date = (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d')
         
         # 取得財報數據
-        df_financials = FM_DATA_LOADER.taiwan_stock_financial_statements(
-            stock_id=raw_id, start_date=start_date
+        df_financials = FM_DATA_LOADER.get_data(
+            dataset="TaiwanStockFinancialStatements",
+            stock_id=raw_id,
+            start_date=start_date
         )
         
         def fm_extract(data_type, default=0):
             try:
+                # FinMind 財報數據的欄位通常是 'type' 和 'value'
                 filtered = df_financials[df_financials['type'] == data_type]
-                return float(filtered.iloc[-1]['value']) if not filtered.empty else default
-            except: return default
+                if not filtered.empty:
+                    return float(filtered.iloc[-1]['value'])
+                return default
+            except: 
+                return default
+
+        # 這裡要注意：FinMind 的 type 名稱要精確
+        # ROE 通常對應 'Return_on_Equity_A_Percent'
+        # 毛利率通常對應 'Gross_Profit_Margin'
+        roe = fm_extract('Return_on_Equity_A_Percent') 
+        gross_margin = fm_extract('Gross_Profit_Margin')
 
         # 提取核心指標
         roe = fm_extract('Return_on_Equity_A_Percent') # ROE
@@ -102,13 +114,14 @@ def get_advanced_quant_data(stock_id: str):
             "現價": round(current_price, 2),
             "PE": round(info.get("trailingPE", 0) or 0, 2),
             "PB": round(info.get("priceToBook", 0) or 0, 2),
+            # 如果 FinMind 沒抓到，就用 yfinance 的 (即便可能是 0)，至少不會報錯
             "ROE": round(roe if roe != 0 else (info.get("returnOnEquity", 0)*100), 2),
             "毛利率": round(gross_margin if gross_margin != 0 else (info.get("grossMargins", 0)*100), 2),
             "殖利率": round((info.get("dividendYield", 0) or 0) * 100, 2),
-            "K值": round(df['STOCHk_9_3_3'].iloc[-1], 2),
-            "D值": round(df['STOCHd_9_3_3'].iloc[-1], 2),
-            "MACD": round(df['MACD_12_26_9'].iloc[-1], 2),
-            "RSI14": round(df['RSI'].iloc[-1], 2),
+            "K值": round(df.get('STOCHk_9_3_3', [0])[-1], 2), # 使用 .get 防止欄位缺失
+            "D值": round(df.get('STOCHd_9_3_3', [0])[-1], 2),
+            "MACD": round(df.get('MACD_12_26_9', [0])[-1], 2),
+            "RSI14": round(df.get('RSI', [0])[-1], 2),
             "乖離率%": round(((current_price / df['MA20'].iloc[-1]) - 1) * 100, 2)
         }
         
