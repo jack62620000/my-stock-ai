@@ -107,7 +107,18 @@ def get_advanced_quant_data(stock_id: str):
             roe = get_val(df_fin, 'Return_on_Equity_A_Percent')
             gross_margin = get_val(df_fin, 'Gross_Profit_Margin')
     except: pass
-
+        dividend_yield = 0
+        try:
+            df_div = FM_DATA_LOADER.get_data(
+                dataset="TaiwanStockDividend",
+                stock_id=raw_id,
+                start_date=(datetime.now() - timedelta(days=730)).strftime('%Y-%m-%d')
+            )
+            if not df_div.empty:
+            # 計算近一年股利總和 / 現價
+                yearly_div = df_div.groupby(df_div['date'].dt.year)['CashDividend'].sum().iloc[-1]
+                dividend_yield = (yearly_div / current_price) * 100
+        except: pass
     # --- 4. 計算技術指標 (使用 pandas_ta) ---
     try:
         df.ta.stoch(high='High', low='Low', close='Close', k=9, d=3, append=True)
@@ -126,6 +137,7 @@ def get_advanced_quant_data(stock_id: str):
             "PB": round(pb, 2),
             "ROE": round(roe, 2),
             "毛利率": round(gross_margin, 2),
+            "殖利率": round(dividend_yield, 2), # 補上這個 Key
             "K值": round(df['STOCHk_9_3_3'].iloc[-1], 2) if 'STOCHk_9_3_3' in df else 0,
             "D值": round(df['STOCHd_9_3_3'].iloc[-1], 2) if 'STOCHd_9_3_3' in df else 0,
             "MACD": round(df['MACD_12_26_9'].iloc[-1], 2) if 'MACD_12_26_9' in df else 0,
@@ -167,8 +179,8 @@ if run_btn:
         prompt = f"""
         你是一位精通股票數據分析與價值投資的專家。請針對台股代號 {stock_input} 名稱 {data['名稱']} 撰寫深度報告。
         數據參考：
-        - 財務：ROE {data['ROE']}%, 毛利 {data['毛利率']}%, PE {data['PE']}, PB {data['PB']}, 殖利率 {data['殖利率']}%
-        - 技術：K/D {data['K值']}/{data['D值']}, MACD {data['MACD']}, RSI {data['RSI14']}, 乖離率 {data['乖離率%']}%
+        - 財務：ROE {data.get('ROE', 0)}%, 毛利 {data.get('毛利率', 0)}%, PE {data.get('PE', 0)}, PB {data.get('PB', 0)}, 殖利率 {data.get('殖利率', 0)}%
+        - 技術：K/D {data.get('K值', 0)}/{data.get('D值', 0)}, MACD {data.get('MACD', 0)}, RSI {data.get('RSI14', 0)}, 乖離率 {data.get('乖離率%', 0)}%
         
         請依照下列五大模組分析：
         🌍 【全球局勢與宏觀風險分析】：分析2026年當前全球環境局勢（如關稅新制、地緣衝突）對該公司的衝擊。判斷其為「受災戶」或「受惠者」，並評估供應鏈韌性。
