@@ -41,87 +41,79 @@ AVAILABLE_MODELS = get_available_models()
 # ===============================
 @st.cache_data(ttl=3600)
 def get_advanced_quant_data(stock_id: str):
-    # 統一處理代碼，FinMind 不需要 .TW
     raw_id = stock_id.split('.')[0]
     df = pd.DataFrame()
-    metrics = {}
-
-    # --- 1. 抓取 K 線數據 (優先使用 FinMind) ---
+    current_price = 0.0
+    
+    # --- 1. 抓取 K 線數據 (修正版備援邏輯) ---
+    # 先嘗試 yfinance (因為它不需 Token，歷史數據穩定)
     try:
-        df_fm = FM_DATA_LOADER.get_data(
-            dataset="TaiwanStockPrice",
-            stock_id=raw_id,
-            start_date=(datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d')
-        )
-        
-        if not df_fm.empty:
-            # 修正欄位名稱映射，避免 KeyError
-            # FinMind 欄位: date, open, max (High), min (Low), close, Trading_Volume
-            df = df_fm.rename(columns={
-                'date': 'Date', 'open': 'Open', 'max': 'High', 
-                'min': 'Low', 'close': 'Close', 'Trading_Volume': 'Volume'
-            })
-            df.set_index('Date', inplace=True)
-            df.index = pd.to_datetime(df.index)
-    except Exception as e:
-        st.warning(f"FinMind K線抓取失敗: {e}")
+        ticker = yf.Ticker(f"{raw_id}.TW")
+        df = ticker.history(period="1y")
+        if df.empty:
+            df = yf.Ticker(f"{raw_id}.TWO").history(period="1y")
+        if not df.empty:
+            current_price = float(df['Close'].iloc[-1])
+    except:
+        pass
 
-    # 如果 FinMind 失敗，嘗試 Yahoo (備援)
+    # 如果 yfinance 失敗 (Rate Limit)，嘗試 FinMind
     if df.empty:
         try:
-            ticker = yf.Ticker(f"{raw_id}.TW")
-            df = ticker.history(period="1y")
-        except: pass
+            df_fm = FM_DATA_LOADER.get_data(
+                dataset="TaiwanStockPrice",
+                stock_id=raw_id,
+                start_date=(datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d')
+            )
+            if not df_fm.empty:
+                df = df_fm.rename(columns={
+                    'date': 'Date', 'open': 'Open', 'max': 'High', 
+                    'min': 'Low', 'close': 'Close', 'Trading_Volume': 'Volume'
+                })
+                df.set_index('Date', inplace=True)
+                df.index = pd.to_datetime(df.index)
+                current_price = float(df['Close'].iloc[-1])
+        except Exception as e:
+            st.warning(f"⚠️ 多方數據源皆無法取得價格: {e}")
 
-    if df.empty:
-        st.error("無法取得股價數據，請檢查 API 或代號。")
+    if df.empty or current_price == 0:
         return None, None
 
-    # --- 2. 抓取 PE / PB (從 FinMind 獲取，不依賴 Yahoo) ---
-    pe, pb = 0, 0
+    # --- 2. 抓取 基本面 (ROE, 毛利, PE, PB) ---
+    roe, gross_margin, pe, pb = 0.0, 0.0, 0.0, 0.0
     try:
-        df_per = FM_DATA_LOADER.get_data(
-            dataset="TaiwanStockPER",
-            stock_id=raw_id,
-            start_date=(datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
-        )
-        if not df_per.empty:
-            pe = df_per.iloc[-1]['PE']
-            pb = df_per.iloc[-1]['PBR']
-    except: pass
-
-    # --- 3. 抓取 財報指標 (ROE, 毛利) ---
-    roe, gross_margin = 0, 0
-    try:
+        # 財報
         df_fin = FM_DATA_LOADER.get_data(
             dataset="TaiwanStockFinancialStatements",
             stock_id=raw_id,
             start_date=(datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d')
         )
         if not df_fin.empty:
-            # 安全取值邏輯
-            def get_val(df, type_name):
-                match = df[df['type'] == type_name]
-                return float(match.iloc[-1]['value']) if not match.empty else 0
-            
-            roe = get_val(df_fin, 'Return_on_Equity_A_Percent')
-            gross_margin = get_val(df_fin, 'Gross_Profit_Margin')
-    except: pass
-    dividend_yield = 0
-    try:
-        df_div = FM_DATA_LOADER.get_data(
-            dataset="TaiwanStockDividend",
-            stock_id=raw_id,
-            start_date=(datetime.now() - timedelta(days=730)).strftime('%Y-%m-%d')
-        )
-        if not df_div.empty:
-            # 安全檢查：確保有 CashDividend 欄位
-            if 'CashDividend' in df_div.columns:
-                yearly_div = df_div.groupby(df_div['date'].dt.year)['CashDividend'].sum().iloc[-1]
-                dividend_yield = (yearly_div / current_price) * 100
+            def safe_extract(t):
+                m = df_fin[df_fin['type'] == t]
+                return float(m.iloc[-1]['value']) if not m.empty else 0.0
+            roe = safe_extract('Return_on_Equity_A_Percent')
+            gross_margin = safe_extract('Gross_Profit_Margin')
+        
+        # 估值
+        df_per = FM_DATA_LOADER.get_data(dataset="TaiwanStockPER", stock_id=raw_id, start_date=(datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d'))
+        if not df_per.empty:
+            pe = float(df_per.iloc[-1]['PE'])
+            pb = float(df_per.iloc[-1]['PBR'])
     except:
-        dividend_yield = 0
-    # --- 4. 計算技術指標 (使用 pandas_ta) ---
+        pass
+
+    # --- 3. 抓取 殖利率 ---
+    dividend_yield = 0.0
+    try:
+        df_div = FM_DATA_LOADER.get_data(dataset="TaiwanStockDividend", stock_id=raw_id, start_date=(datetime.now() - timedelta(days=730)).strftime('%Y-%m-%d'))
+        if not df_div.empty and 'CashDividend' in df_div.columns:
+            yearly_div = df_div.groupby(df_div['date'].dt.year)['CashDividend'].sum().iloc[-1]
+            dividend_yield = (yearly_div / current_price) * 100
+    except:
+        pass
+
+    # --- 4. 技術指標計算 ---
     try:
         df.ta.stoch(high='High', low='Low', close='Close', k=9, d=3, append=True)
         df.ta.macd(close='Close', fast=12, slow=26, signal=9, append=True)
@@ -129,27 +121,27 @@ def get_advanced_quant_data(stock_id: str):
         df['MA20'] = ta.sma(df['Close'], length=20)
         df = df.fillna(0)
         
-        current_price = df['Close'].iloc[-1]
+        # 建立常用名稱對照，解決 AI 幻覺
+        name_map = {"3481": "群創光電", "2330": "台積電", "2317": "鴻海"}
+        stock_name = name_map.get(raw_id, f"台股 {raw_id}")
 
-        # --- 5. 封裝結果 ---
         metrics = {
-            "名稱": f"台股 {raw_id}",
+            "名稱": stock_name,
             "現價": round(current_price, 2),
             "PE": round(pe, 2),
             "PB": round(pb, 2),
             "ROE": round(roe, 2),
             "毛利率": round(gross_margin, 2),
-            "殖利率": round(dividend_yield, 2), # 補上這個 Key
-            "K值": round(df['STOCHk_9_3_3'].iloc[-1], 2) if 'STOCHk_9_3_3' in df else 0,
-            "D值": round(df['STOCHd_9_3_3'].iloc[-1], 2) if 'STOCHd_9_3_3' in df else 0,
-            "MACD": round(df['MACD_12_26_9'].iloc[-1], 2) if 'MACD_12_26_9' in df else 0,
-            "RSI14": round(df['RSI'].iloc[-1], 2) if 'RSI' in df else 0,
-            "乖離率%": round(((current_price / df['MA20'].iloc[-1]) - 1) * 100, 2) if 'MA20' in df else 0
+            "殖利率": round(dividend_yield, 2),
+            "K值": round(df['STOCHk_9_3_3'].iloc[-1], 2) if 'STOCHk_9_3_3' in df.columns else 0,
+            "D值": round(df['STOCHd_9_3_3'].iloc[-1], 2) if 'STOCHd_9_3_3' in df.columns else 0,
+            "MACD": round(df['MACD_12_26_9'].iloc[-1], 2) if 'MACD_12_26_9' in df.columns else 0,
+            "RSI14": round(df['RSI'].iloc[-1], 2) if 'RSI' in df.columns else 0,
+            "乖離率%": round(((current_price / df['MA20'].iloc[-1]) - 1) * 100, 2) if 'MA20' in df.columns else 0
         }
         return metrics, df.tail(10)
-        
     except Exception as e:
-        st.error(f"技術指標計算失敗: {e}")
+        st.error(f"⚠️ 技術指標計算失敗: {e}")
         return None, None
 
 # ===============================
