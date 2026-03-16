@@ -34,45 +34,48 @@ AVAILABLE_MODELS = get_available_models()
 # ===============================
 @st.cache_data(ttl=3600)
 def get_advanced_quant_data(stock_id: str):
-    # 1. 容錯處理：自動判定上市 (.TW) 或 上櫃 (.TWO)
-    # 台灣常用的邏輯：先試上市，失敗再試上櫃
+    # 1. 統一格式化代號
     raw_id = stock_id.split('.')[0]
     
-    def try_fetch(suffix):
-        full_id = f"{raw_id}{suffix}"
-        t = yf.Ticker(full_id)
-        df = t.history(period="1y")
-        return t, df, full_id
-
-    ticker, df, final_id = try_fetch(".TW")
-    if df.empty:
-        ticker, df, final_id = try_fetch(".TWO")
-    
-    if df.empty: return None, None
+    # 2. 初始化變數，防止 "local variable not associated with a value"
+    info = {} 
+    df = pd.DataFrame()
+    final_id = f"{raw_id}.TW"
 
     try:
-        # 2. 為了防止 Rate Limit，我們只抓一次 info 並存起來
-        # 警告：info 請求非常不穩定，若失敗則給予預設值
-        try:
-            info = ticker.info
-            stock_name = info.get('longName') or info.get('shortName') or f"台股 {stock_id}"
-            time.sleep(0.5) # 微小延遲保護
-        except:
-            stock_name = f"台股代號 {stock_id}" # 抓不到就給代號，避免 AI 瞎猜
+        # 3. 嘗試抓取上市資料，若失敗嘗試上櫃
+        ticker = yf.Ticker(final_id)
+        df = ticker.history(period="1y")
+        if df.empty:
+            final_id = f"{raw_id}.TWO"
+            ticker = yf.Ticker(final_id)
+            df = ticker.history(period="1y")
+        
+        if df.empty:
+            return None, None
 
-        # 3. 技術指標計算 (保持你的 pandas_ta 邏輯)
+        # 4. 安全抓取 info (基本面)
+        try:
+            # 這裡是最容易被 Rate Limit 的地方
+            info = ticker.info 
+        except:
+            info = {} # 抓不到就給空，不讓程式掛掉
+
+        # 5. 計算技術指標 (使用 pandas_ta)
         df.ta.stoch(high='High', low='Low', k=9, d=3, append=True)
         df.ta.macd(fast=12, slow=26, signal=9, append=True)
         df['RSI'] = ta.rsi(df['Close'], length=14)
         df['MA20'] = ta.sma(df['Close'], length=20)
-        
-        # 處理指標可能產生的 NaN (避免後續計算錯誤)
         df = df.fillna(0)
 
-        # 4. 基本面數據提取 (加入預設值防止 Crash)
+        # 6. 核心數據組裝 (加入多層防呆)
         dy = info.get("dividendYield", 0) or 0
+        
+        # 解決「3481 誤認」問題：優先顯示代號，輔以抓到的名稱
+        official_name = info.get("shortName") or info.get("longName") or f"台股 {raw_id}"
+        
         metrics = {
-            "名稱": info.get("shortName", final_id),
+            "名稱": official_name,
             "現價": round(df['Close'].iloc[-1], 2),
             "PE": round(info.get("trailingPE", 0) or 0, 2),
             "PB": round(info.get("priceToBook", 0) or 0, 2),
@@ -90,8 +93,10 @@ def get_advanced_quant_data(stock_id: str):
         recent_history.index = recent_history.index.strftime('%Y-%m-%d')
         
         return metrics, recent_history
+
     except Exception as e:
-        st.error(f"數據解析出錯: {e}")
+        # 這裡會捕捉到所有其餘錯誤
+        st.error(f"⚠️ 數據抓取中斷: {e}")
         return None, None
 
 # ===============================
