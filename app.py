@@ -2,6 +2,7 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import pandas_ta as ta
+import time
 from google import genai
 from datetime import datetime
 
@@ -33,30 +34,50 @@ AVAILABLE_MODELS = get_available_models()
 # ===============================
 @st.cache_data(ttl=3600)
 def get_advanced_quant_data(stock_id: str):
-    ticker_id = f"{stock_id.replace('.TW', '').replace('.TWO', '')}.TW"
+    # 1. 容錯處理：自動判定上市 (.TW) 或 上櫃 (.TWO)
+    # 台灣常用的邏輯：先試上市，失敗再試上櫃
+    raw_id = stock_id.split('.')[0]
+    
+    def try_fetch(suffix):
+        full_id = f"{raw_id}{suffix}"
+        t = yf.Ticker(full_id)
+        df = t.history(period="1y")
+        return t, df, full_id
+
+    ticker, df, final_id = try_fetch(".TW")
+    if df.empty:
+        ticker, df, final_id = try_fetch(".TWO")
+    
+    if df.empty: return None, None
+
     try:
-        ticker = yf.Ticker(ticker_id)
-        df = ticker.history(period="1y")
-        if df.empty: return None, None
-        
-        # 技術指標計算 (KD, MACD, RSI)
-        df.ta.stoch(high='High', low='Low', k=9, d=3, append=True) # STOCHk_9_3_3, STOCHd_9_3_3
-        df.ta.macd(fast=12, slow=26, signal=9, append=True)        # MACD_12_26_9
+        # 2. 為了防止 Rate Limit，我們只抓一次 info 並存起來
+        # 警告：info 請求非常不穩定，若失敗則給予預設值
+        try:
+            info = ticker.info
+            time.sleep(0.5) # 微小延遲保護
+        except:
+            info = {}
+
+        # 3. 技術指標計算 (保持你的 pandas_ta 邏輯)
+        df.ta.stoch(high='High', low='Low', k=9, d=3, append=True)
+        df.ta.macd(fast=12, slow=26, signal=9, append=True)
         df['RSI'] = ta.rsi(df['Close'], length=14)
         df['MA20'] = ta.sma(df['Close'], length=20)
         
-        info = ticker.info
-        
-        # 抓取基本面
+        # 處理指標可能產生的 NaN (避免後續計算錯誤)
+        df = df.fillna(0)
+
+        # 4. 基本面數據提取 (加入預設值防止 Crash)
         dy = info.get("dividendYield", 0) or 0
         metrics = {
-            "名稱": info.get("shortName", "未知"),
+            "名稱": info.get("shortName", final_id),
             "現價": round(df['Close'].iloc[-1], 2),
             "PE": round(info.get("trailingPE", 0) or 0, 2),
             "PB": round(info.get("priceToBook", 0) or 0, 2),
             "ROE": round((info.get("returnOnEquity", 0) or 0) * 100, 2),
             "毛利率": round((info.get("grossMargins", 0) or 0) * 100, 2),
-            "殖利率": round(dy if dy > 1 else dy * 100, 2),
+            "殖利率": round(dy * 100 if dy < 1 else dy, 2),
             "K值": round(df['STOCHk_9_3_3'].iloc[-1], 2),
             "D值": round(df['STOCHd_9_3_3'].iloc[-1], 2),
             "MACD": round(df['MACD_12_26_9'].iloc[-1], 2),
@@ -66,7 +87,6 @@ def get_advanced_quant_data(stock_id: str):
         
         recent_history = df.tail(10).copy()
         recent_history.index = recent_history.index.strftime('%Y-%m-%d')
-        recent_history = recent_history[['Open', 'High', 'Low', 'Close', 'Volume']].round(2)
         
         return metrics, recent_history
     except Exception as e:
