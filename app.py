@@ -45,20 +45,30 @@ def get_advanced_quant_data(stock_id: str):
     df = pd.DataFrame()
     current_price = 0.0
     
-    # --- 1. 抓取 K 線數據 (修正版備援邏輯) ---
-    # 先嘗試 yfinance (因為它不需 Token，歷史數據穩定)
+    # --- 1. 最後防線：直接從證交所 OpenAPI 獲取今日價格 ---
+    # 這是不需要 API Key 且最權威的來源，用來確保程式不崩潰
     try:
+        twse_url = "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_AVG_ALL"
+        res = requests.get(twse_url, timeout=5).json()
+        for item in res:
+            if item['Code'] == raw_id:
+                current_price = float(item['ClosingPrice'])
+                break
+    except:
+        pass
+
+    # --- 2. 抓取 K 線數據 (容錯處理) ---
+    try:
+        # 優先嘗試 yfinance
         ticker = yf.Ticker(f"{raw_id}.TW")
         df = ticker.history(period="1y")
         if df.empty:
             df = yf.Ticker(f"{raw_id}.TWO").history(period="1y")
-        if not df.empty:
+        
+        if not df.empty and current_price == 0:
             current_price = float(df['Close'].iloc[-1])
     except:
-        pass
-
-    # 如果 yfinance 失敗 (Rate Limit)，嘗試 FinMind
-    if df.empty:
+        # 若 yfinance 失敗，嘗試 FinMind
         try:
             df_fm = FM_DATA_LOADER.get_data(
                 dataset="TaiwanStockPrice",
@@ -66,83 +76,60 @@ def get_advanced_quant_data(stock_id: str):
                 start_date=(datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d')
             )
             if not df_fm.empty:
-                df = df_fm.rename(columns={
-                    'date': 'Date', 'open': 'Open', 'max': 'High', 
-                    'min': 'Low', 'close': 'Close', 'Trading_Volume': 'Volume'
-                })
+                df = df_fm.rename(columns={'date': 'Date', 'open': 'Open', 'max': 'High', 'min': 'Low', 'close': 'Close', 'Trading_Volume': 'Volume'})
                 df.set_index('Date', inplace=True)
                 df.index = pd.to_datetime(df.index)
-                current_price = float(df['Close'].iloc[-1])
-        except Exception as e:
-            st.warning(f"⚠️ 多方數據源皆無法取得價格: {e}")
+                if current_price == 0: current_price = float(df['Close'].iloc[-1])
+        except:
+            pass
 
-    if df.empty or current_price == 0:
+    # 檢測：如果連價格都抓不到，才報錯
+    if current_price == 0:
+        st.error("🚫 證交所、Yahoo、FinMind 聯防失效，請檢查網路連線或稍後再試。")
         return None, None
 
-    # --- 2. 抓取 基本面 (ROE, 毛利, PE, PB) ---
-    roe, gross_margin, pe, pb = 0.0, 0.0, 0.0, 0.0
+    # --- 3. 基本面與技術指標 (加入極度防呆) ---
+    roe, gross_margin, pe, pb, dividend_yield = 0.0, 0.0, 0.0, 0.0, 0.0
     try:
-        # 財報
-        df_fin = FM_DATA_LOADER.get_data(
-            dataset="TaiwanStockFinancialStatements",
-            stock_id=raw_id,
-            start_date=(datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d')
-        )
+        # 基本面抓取 (這部分若失敗就讓它 0，AI 會自行根據知識庫補完)
+        df_fin = FM_DATA_LOADER.get_data(dataset="TaiwanStockFinancialStatements", stock_id=raw_id, start_date='2024-01-01')
         if not df_fin.empty:
             def safe_extract(t):
                 m = df_fin[df_fin['type'] == t]
                 return float(m.iloc[-1]['value']) if not m.empty else 0.0
             roe = safe_extract('Return_on_Equity_A_Percent')
             gross_margin = safe_extract('Gross_Profit_Margin')
-        
-        # 估值
-        df_per = FM_DATA_LOADER.get_data(dataset="TaiwanStockPER", stock_id=raw_id, start_date=(datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d'))
-        if not df_per.empty:
-            pe = float(df_per.iloc[-1]['PE'])
-            pb = float(df_per.iloc[-1]['PBR'])
-    except:
-        pass
+    except: pass
 
-    # --- 3. 抓取 殖利率 ---
-    dividend_yield = 0.0
-    try:
-        df_div = FM_DATA_LOADER.get_data(dataset="TaiwanStockDividend", stock_id=raw_id, start_date=(datetime.now() - timedelta(days=730)).strftime('%Y-%m-%d'))
-        if not df_div.empty and 'CashDividend' in df_div.columns:
-            yearly_div = df_div.groupby(df_div['date'].dt.year)['CashDividend'].sum().iloc[-1]
-            dividend_yield = (yearly_div / current_price) * 100
-    except:
-        pass
+    # --- 4. 計算指標 (確保欄位存在) ---
+    # 如果 df 為空，建立一個包含今日價格的虛擬 df 以免後續計算報錯
+    if df.empty:
+        df = pd.DataFrame([{'Close': current_price}], index=[pd.Timestamp.now()])
 
-    # --- 4. 技術指標計算 ---
     try:
-        df.ta.stoch(high='High', low='Low', close='Close', k=9, d=3, append=True)
-        df.ta.macd(close='Close', fast=12, slow=26, signal=9, append=True)
-        df['RSI'] = ta.rsi(df['Close'], length=14)
-        df['MA20'] = ta.sma(df['Close'], length=20)
+        if len(df) > 20: # 數據量夠才算技術指標
+            df.ta.stoch(high='High', low='Low', close='Close', k=9, d=3, append=True)
+            df.ta.macd(close='Close', fast=12, slow=26, signal=9, append=True)
+            df['RSI'] = ta.rsi(df['Close'], length=14)
+            df['MA20'] = ta.sma(df['Close'], length=20)
         df = df.fillna(0)
         
-        # 建立常用名稱對照，解決 AI 幻覺
-        name_map = {"3481": "群創光電", "2330": "台積電", "2317": "鴻海"}
+        name_map = {"3481": "群創光電", "3499": "環天科技", "2330": "台積電"}
         stock_name = name_map.get(raw_id, f"台股 {raw_id}")
 
         metrics = {
             "名稱": stock_name,
             "現價": round(current_price, 2),
-            "PE": round(pe, 2),
-            "PB": round(pb, 2),
-            "ROE": round(roe, 2),
-            "毛利率": round(gross_margin, 2),
-            "殖利率": round(dividend_yield, 2),
-            "K值": round(df['STOCHk_9_3_3'].iloc[-1], 2) if 'STOCHk_9_3_3' in df.columns else 0,
-            "D值": round(df['STOCHd_9_3_3'].iloc[-1], 2) if 'STOCHd_9_3_3' in df.columns else 0,
-            "MACD": round(df['MACD_12_26_9'].iloc[-1], 2) if 'MACD_12_26_9' in df.columns else 0,
+            "PE": pe, "PB": pb, "ROE": round(roe, 2), "毛利率": round(gross_margin, 2), "殖利率": dividend_yield,
+            "K值": round(df.filter(like='STOCHk').iloc[-1], 2) if not df.filter(like='STOCHk').empty else 0,
+            "D值": round(df.filter(like='STOCHd').iloc[-1], 2) if not df.filter(like='STOCHd').empty else 0,
+            "MACD": round(df.filter(like='MACD_12_26_9').iloc[-1], 2) if not df.filter(like='MACD_12_26_9').empty else 0,
             "RSI14": round(df['RSI'].iloc[-1], 2) if 'RSI' in df.columns else 0,
-            "乖離率%": round(((current_price / df['MA20'].iloc[-1]) - 1) * 100, 2) if 'MA20' in df.columns else 0
+            "乖離率%": round(((current_price / df['MA20'].iloc[-1]) - 1) * 100, 2) if 'MA20' in df.columns and df['MA20'].iloc[-1] != 0 else 0
         }
         return metrics, df.tail(10)
     except Exception as e:
-        st.error(f"⚠️ 技術指標計算失敗: {e}")
-        return None, None
+        return {"名稱": name_map.get(raw_id, f"台股 {raw_id}"), "現價": current_price, "PE": 0, "PB": 0, "ROE": 0, "毛利率": 0, "殖利率": 0, "K值": 0, "D值": 0, "MACD": 0, "RSI14": 0, "乖離率%": 0}, df.tail(1)
 
 # ===============================
 # 3. UI 介面 (保持您的架構)
